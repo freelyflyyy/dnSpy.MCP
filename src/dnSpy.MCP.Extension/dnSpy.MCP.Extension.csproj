@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+      <TargetFramework>net10.0-windows</TargetFramework>
+	  <UseWPF>true</UseWPF>
+      <ImplicitUsings>enable</ImplicitUsings>
+	  <Nullable>enable</Nullable>
+
+
+	  <AssemblyName>dnSpy.MCP.Extension.x</AssemblyName>
+	  <RootNamespace>dnSpy.MCP.Extension</RootNamespace>
+
+	  <DnSpyDir>D:\Tools\dnSpyEx\bin</DnSpyDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- dnSpy discovers icons under images/ in the compiled assembly. -->
+	  <Page Update="Resources\Images\icon_mcp.xaml">
+		  <Link>Images\icon_mcp.xaml</Link>
+	  </Page>
+  </ItemGroup>
+
+  <ItemGroup>
+	  <Reference Include="dnSpy.Contracts.DnSpy">
+		  <HintPath>$(DnSpyDir)\dnSpy.Contracts.DnSpy.dll</HintPath>
+		  <Private>False</Private>
+	  </Reference>
+	  <Reference Include="dnSpy.Contracts.Logic">
+		  <HintPath>$(DnSpyDir)\dnSpy.Contracts.Logic.dll</HintPath>
+		  <Private>False</Private>
+	  </Reference>
+	  <Reference Include="System.ComponentModel.Composition">
+		  <HintPath>$(DnSpyDir)\System.ComponentModel.Composition.dll</HintPath>
+		  <Private>False</Private>
+	  </Reference>
+	  <Reference Include="dnlib">
+		  <HintPath>$(DnSpyDir)\dnlib.dll</HintPath>
+		  <Private>false</Private>
+	  </Reference>
+  </ItemGroup>
+
+</Project>
