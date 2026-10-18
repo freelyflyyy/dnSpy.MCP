@@ -30,6 +30,27 @@ namespace dnSpy.MCP.Extension.Api {
             return matches[0].AssemblyDef!;
         }
 
+        internal ModuleDef GetModule(string filePath, string moduleName) {
+            if (string.IsNullOrWhiteSpace(moduleName)) {
+                throw new ArgumentException("Module name cannot be null or whitespace.", nameof(moduleName));
+            }
+
+            var assembly = GetAssembly(filePath);
+
+            var modules = assembly.Modules
+                .Where(module => string.Equals(
+                    module.Name.String,
+                    moduleName,
+                    StringComparison.Ordinal))
+                .ToArray();
+
+            if (modules.Length != 1) {
+                throw new InvalidOperationException($"Expected to match exactly one module, but found {modules.Length}.");
+            }
+
+            return modules[0];
+        }
+
         public AssemblyInfo[] ListAssemblies() {
             var assemblies = new List<AssemblyInfo>();
 
@@ -77,27 +98,11 @@ namespace dnSpy.MCP.Extension.Api {
             return types.ToArray();
         }
         public MethodInfo[] ListMethods(string filePath,string moduleName, uint typeToken, int limit = 100) {
-            if (string.IsNullOrWhiteSpace(moduleName)) {
-                throw new ArgumentException("Module name is cannot be null or whitespace.", nameof(moduleName));
-            }
-
             if (limit <= 0) {
                 throw new ArgumentOutOfRangeException(nameof(limit));
             }
 
-            var assembly = GetAssembly(filePath);
-            var modules = assembly.Modules
-                .Where(module => string.Equals(
-                    module.Name.String,
-                    moduleName,
-                    StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-
-            if (modules.Length != 1) {
-                throw new InvalidOperationException($"Expected to match exactly one module, but found {modules.Length}.");
-            }
-
-            var module = modules[0];
+            var module = GetModule(filePath, moduleName);
 
             if (module.ResolveToken(typeToken) is not TypeDef type) {
                 throw new ArgumentException(

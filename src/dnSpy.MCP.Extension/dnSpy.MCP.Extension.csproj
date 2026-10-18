@@ -37,6 +37,10 @@
 		  <HintPath>$(DnSpyDir)\dnlib.dll</HintPath>
 		  <Private>false</Private>
 	  </Reference>
+	  <Reference Include="Microsoft.VisualStudio.CoreUtility">
+		  <HintPath>$(DnSpyDir)\Microsoft.VisualStudio.CoreUtility.dll</HintPath>
+		  <Private>false</Private>
+	  </Reference>
   </ItemGroup>
 
 </Project>

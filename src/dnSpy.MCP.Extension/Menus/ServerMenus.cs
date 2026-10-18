@@ -1,22 +1,27 @@
 ﻿using dnSpy.Contracts.App;
 using dnSpy.Contracts.Menus;
 using dnSpy.MCP.Extension.Api;
+using dnSpy.MCP.Extension.UI;
 using System.ComponentModel.Composition;
 
 namespace dnSpy.MCP.Extension.Menus {
     [ExportMenuItem(
         OwnerGuid = MenuConstants.APP_MENU_VIEW_GUID,
-        Header = "查看已加载文档",
+        Header = "反编译到输出窗口",
         Icon = "icon_mcp",
         Group = MenuConstants.GROUP_APP_MENU_VIEW_WINDOWS,
         Order = 1000
         )]
     public sealed class ServerMenus : MenuItemBase {
         private readonly DocumentApi documents;
+        private readonly DecompilerApi decompiler;
+        private readonly McpOutput output;
 
         [ImportingConstructor]
-        public ServerMenus(DocumentApi documents) {
+        public ServerMenus(DocumentApi documents, DecompilerApi decompiler, McpOutput output) {
             this.documents = documents;
+            this.decompiler = decompiler;
+            this.output = output;
         }
 
         public override void Execute(IMenuItemContext context) {
@@ -47,26 +52,29 @@ namespace dnSpy.MCP.Extension.Menus {
                     type.Token,
                     methodLimit);
 
-                var entries = methods.Select(method =>
-                    $"0x{method.Token:X8}  {method.FullName}"
-                    + Environment.NewLine
-                    + $"包含 IL 方法体：{method.HasBody}");
+                var method = methods.FirstOrDefault(item => item.HasBody);
 
-                MsgBox.Instance.Show(
+                if (method is null) {
+                    MsgBox.Instance.Show("当前获取到的函数都没有方法体");
+                    return;
+                }
+
+                var code = decompiler.DecompileMethod(
+                    assemblies.FilePath,
+                    type.ModuleName,
+                    method.Token);
+
+                output.WriteResult(
                     $"程序集：{assemblies.FullName}"
                     + Environment.NewLine
                     + $"路径：{assemblies.FilePath}"
                     + Environment.NewLine
                     + $"模块：{type.ModuleName}"
                     + Environment.NewLine
-                    + $"类型：0x{type.Token:X8}  {type.FullName}"
-                    + Environment.NewLine
-                    + $"显示 {methods.Length} 个方法，最多 {methodLimit} 个："
+                    + $"方法：0x{method.Token:X8}  {method.FullName}"
                     + Environment.NewLine
                     + Environment.NewLine
-                    + string.Join(
-                        Environment.NewLine + Environment.NewLine,
-                        entries));
+                    + code);
             } catch (ArgumentException ex) {
                 MsgBox.Instance.Show($"参数错误：{ex.Message}");
             } catch (InvalidOperationException ex) {
