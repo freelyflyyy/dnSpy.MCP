@@ -1,86 +1,62 @@
-﻿using dnSpy.Contracts.App;
-using dnSpy.Contracts.Menus;
-using dnSpy.MCP.Extension.Api;
+﻿using dnSpy.Contracts.Menus;
+using dnSpy.MCP.Extension.Scripting;
 using dnSpy.MCP.Extension.UI;
+using Microsoft.Win32;
 using System.ComponentModel.Composition;
+using System.IO;
+using System.Text.Json;
 
 namespace dnSpy.MCP.Extension.Menus {
     [ExportMenuItem(
         OwnerGuid = MenuConstants.APP_MENU_VIEW_GUID,
-        Header = "反编译到输出窗口",
+        Header = "运行 C# 脚本",
         Icon = "icon_mcp",
         Group = MenuConstants.GROUP_APP_MENU_VIEW_WINDOWS,
         Order = 1000
         )]
     public sealed class ServerMenus : MenuItemBase {
-        private readonly DocumentApi documents;
-        private readonly DecompilerApi decompiler;
+        private readonly ScriptExecutor script;
         private readonly McpOutput output;
 
         [ImportingConstructor]
-        public ServerMenus(DocumentApi documents, DecompilerApi decompiler, McpOutput output) {
-            this.documents = documents;
-            this.decompiler = decompiler;
+        public ServerMenus(ScriptExecutor script, McpOutput output) {
+            this.script = script;
             this.output = output;
         }
 
-        public override void Execute(IMenuItemContext context) {
-            var assemblies = documents.ListAssemblies()
-                .FirstOrDefault(item => !string.IsNullOrWhiteSpace(item.FilePath));
-
-            if (assemblies is null) {
-                MsgBox.Instance.Show("没有具有文件路径的已加载的程序集");
-                return;
-            }
-
+        public override async void Execute(IMenuItemContext context) {
             try {
-                const int typeLimit = 100;
-                const int methodLimit = 30;
+                var dialog = new OpenFileDialog {
+                    Title = "选择要运行的 C# 脚本",
+                    Filter = "C# 脚本 (*.csx)|*.csx",
+                    CheckFileExists = true,
+                    Multiselect = false
+                };
 
-                var type = documents.ListTypes(assemblies.FilePath, typeLimit)
-                    .FirstOrDefault(item => item.MethodCount > 0);
-
-                if (type is null) {
-                    MsgBox.Instance.Show(
-                        $"在前 {typeLimit} 个类型的查询范围内，没有找到包含方法的类型。");
+                if (dialog.ShowDialog() != true) {
                     return;
                 }
 
-                var methods = documents.ListMethods(
-                    assemblies.FilePath,
-                    type.ModuleName,
-                    type.Token,
-                    methodLimit);
+                var uiThreadId = Environment.CurrentManagedThreadId;
+                var code = await File.ReadAllTextAsync(dialog.FileName);
+                var result = await Task.Run(() => script.ExecuteAsync(code));
 
-                var method = methods.FirstOrDefault(item => item.HasBody);
-
-                if (method is null) {
-                    MsgBox.Instance.Show("当前获取到的函数都没有方法体");
-                    return;
-                }
-
-                var code = decompiler.DecompileMethod(
-                    assemblies.FilePath,
-                    type.ModuleName,
-                    method.Token);
+                var json = JsonSerializer.Serialize(
+                    result,
+                    new JsonSerializerOptions {
+                        WriteIndented = true
+                    });
 
                 output.WriteResult(
-                    $"程序集：{assemblies.FullName}"
+                    $"UI 线程 ID：{uiThreadId}"
                     + Environment.NewLine
-                    + $"路径：{assemblies.FilePath}"
+                    + json);
+            } catch (Exception ex) {
+                output.WriteResult(
+                    $"读取脚本文件或显示结果失败：{ex.GetType().Name}"
                     + Environment.NewLine
-                    + $"模块：{type.ModuleName}"
-                    + Environment.NewLine
-                    + $"方法：0x{method.Token:X8}  {method.FullName}"
-                    + Environment.NewLine
-                    + Environment.NewLine
-                    + code);
-            } catch (ArgumentException ex) {
-                MsgBox.Instance.Show($"参数错误：{ex.Message}");
-            } catch (InvalidOperationException ex) {
-                MsgBox.Instance.Show($"操作错误：{ex.Message}");
+                    + ex.Message);
             }
-
         }
     }
 }

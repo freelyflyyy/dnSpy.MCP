@@ -1,9 +1,6 @@
 ﻿using dnSpy.Contracts.Output;
 using dnSpy.Contracts.Text;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.Composition;
-using System.Text;
 
 namespace dnSpy.MCP.Extension.UI {
     [Export(typeof(McpOutput))]

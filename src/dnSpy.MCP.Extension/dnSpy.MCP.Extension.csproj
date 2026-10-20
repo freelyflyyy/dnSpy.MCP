@@ -41,6 +41,23 @@
 		  <HintPath>$(DnSpyDir)\Microsoft.VisualStudio.CoreUtility.dll</HintPath>
 		  <Private>false</Private>
 	  </Reference>
+	  <!-- Script Component -->
+	  <Reference Include="Microsoft.CodeAnalysis">
+		  <HintPath>$(DnSpyDir)\Microsoft.CodeAnalysis.dll</HintPath>
+		  <Private>false</Private>
+	  </Reference>
+	  <Reference Include="Microsoft.CodeAnalysis.CSharp">
+		  <HintPath>$(DnSpyDir)\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+		  <Private>false</Private>
+	  </Reference>
+	  <Reference Include="Microsoft.CodeAnalysis.Scripting">
+		  <HintPath>$(DnSpyDir)\Microsoft.CodeAnalysis.Scripting.dll</HintPath>
+		  <Private>false</Private>
+	  </Reference>
+	  <Reference Include="Microsoft.CodeAnalysis.CSharp.Scripting">
+		  <HintPath>$(DnSpyDir)\Microsoft.CodeAnalysis.CSharp.Scripting.dll</HintPath>
+		  <Private>false</Private>
+	  </Reference>
   </ItemGroup>
 
 </Project>
