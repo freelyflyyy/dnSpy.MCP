@@ -1,1 +1,0 @@
-return Environment.CurrentManagedThreadId;
