@@ -14,8 +14,6 @@ namespace dnSpy.MCP.Extension.UI {
 
         public void WriteResult(string text) {
             var pane = outputService.Create(PaneGuid, "dnSpy.MCP", "text");
-
-            pane.Clear();
             pane.WriteLine(TextColor.Text, text);
 
             outputService.Select(PaneGuid);
