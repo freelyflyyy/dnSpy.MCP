@@ -52,7 +52,7 @@ namespace dnSpy.MCP.Extension.Scripting {
 
         private async Task<ScriptResult> ExecuteCoreAsync(string code) {
             if (string.IsNullOrWhiteSpace(code)) {
-                return Failure("invalid_request", "Code is null or whitespace.");
+                return ScriptResult.Failure("invalid_request", "Code is null or whitespace.");
             }
 
             object? value;
@@ -65,12 +65,12 @@ namespace dnSpy.MCP.Extension.Scripting {
                     typeof(ScriptGlobals)
                 );
             } catch (CompilationErrorException ex) {
-                return Failure(
+                return ScriptResult.Failure(
                     "compilation_error",
                     "The script compilation failed.",
                     ex.Diagnostics.Select(item => item.ToString()).ToArray());
             } catch (Exception ex) {
-                return Failure(
+                return ScriptResult.Failure(
                     "runtime_error",
                     $"{ex.GetType().Name}: {ex.Message}");
             }
@@ -82,18 +82,11 @@ namespace dnSpy.MCP.Extension.Scripting {
                     Value: jsonValue,
                     Error: null);
             } catch(Exception ex) {
-                return Failure(
+                return ScriptResult.Failure(
                     "serialization_error",
                     "The script has been executed, but the return value could not be converted to JSON:"
                     + $"{ex.GetType().Name}: {ex.Message}");
             };
-        }
-
-        private static ScriptResult Failure(string code, string message, params string[] diagnostics) {
-            return new ScriptResult(
-                Success: false,
-                Value: null,
-                Error: new ScriptError(code, message, diagnostics));
         }
     }
 }
