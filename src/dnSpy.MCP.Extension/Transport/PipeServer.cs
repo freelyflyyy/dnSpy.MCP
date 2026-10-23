@@ -1,4 +1,5 @@
 ﻿using dnSpy.MCP.Extension.Scripting;
+using dnSpy.MCP.Protocol;
 using System.Buffers.Binary;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
@@ -10,10 +11,8 @@ namespace dnSpy.MCP.Extension.Transport {
     [Export(typeof(PipeServer))]
     [PartCreationPolicy(CreationPolicy.Shared)]
     public sealed class PipeServer {
-        private const int MaxRequestSize = 256 * 1024; // 256 KB
-        private const int MaxResponseSize = 4 * 1024 * 1024; // 4 MB
         private readonly ScriptExecutor scripts;
-        public string PipeName => $"dnSpy-Mcp-{Environment.ProcessId}";
+        public string PipeName => PipeProtocol.GetPipeName(Environment.ProcessId);
 
         [ImportingConstructor]
         public PipeServer(ScriptExecutor scripts) {
@@ -29,9 +28,9 @@ namespace dnSpy.MCP.Extension.Transport {
                     PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
 
-                try {
-                    await pipe.WaitForConnectionAsync(stopToken);
+                await pipe.WaitForConnectionAsync(stopToken);
 
+                try {
                     await HandleClientAsync(pipe, stopToken);
                 } catch (OperationCanceledException)
                     when (stopToken.IsCancellationRequested) {
@@ -52,7 +51,7 @@ namespace dnSpy.MCP.Extension.Transport {
             using (var receiveTimeout = CancellationTokenSource.CreateLinkedTokenSource(stopToken)) {
                 receiveTimeout.CancelAfter(TimeSpan.FromSeconds(60));
 
-                requestBytes = await ReadRequestAsync(pipe, receiveTimeout.Token);
+                requestBytes = await PipeProtocol.ReadMessageAsync(pipe, PipeProtocol.MaxRequestSize, receiveTimeout.Token);
             }
             stopToken.ThrowIfCancellationRequested();
 
@@ -74,36 +73,18 @@ namespace dnSpy.MCP.Extension.Transport {
 
             // Serialize the result and send it back to the client
             var responseBytes = JsonSerializer.SerializeToUtf8Bytes(result);
-            if (responseBytes.Length > MaxResponseSize) {
+            if (responseBytes.Length > PipeProtocol.MaxResponseSize) {
                 responseBytes = JsonSerializer.SerializeToUtf8Bytes(
                     ScriptResult.Failure("response_too_large", "The script executed, but the response exceeds 4 MiB."));
             }
 
-            using var sendTimeout = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
-            sendTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+            using var sendTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-            var header = new byte[4];
-            BinaryPrimitives.WriteInt32LittleEndian(header, responseBytes.Length);
-
-            await pipe.WriteAsync(header, sendTimeout.Token);
-            await pipe.WriteAsync(responseBytes, sendTimeout.Token);
-        }
-
-
-        private static async Task<byte[]> ReadRequestAsync(Stream stream, CancellationToken cancellationToken) {
-            var header = new byte[4];
-            await stream.ReadExactlyAsync(header, cancellationToken);
-
-            var length = BinaryPrimitives.ReadInt32LittleEndian(header);
-            if (length <= 0 || length > MaxRequestSize) {
-                throw new InvalidDataException(
-                    "Request size must be between 1 byte and 256 KiB.");
-            }
-
-            var payload = new byte[length];
-            await stream.ReadExactlyAsync(payload, cancellationToken);
-
-            return payload;
+            await PipeProtocol.WriteMessageAsync(
+                pipe,
+                responseBytes,
+                PipeProtocol.MaxResponseSize,
+                sendTimeout.Token);
         }
     }
 }

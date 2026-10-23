@@ -6,12 +6,15 @@
       <ImplicitUsings>enable</ImplicitUsings>
 	  <Nullable>enable</Nullable>
 
-
 	  <AssemblyName>dnSpy.MCP.Extension.x</AssemblyName>
 	  <RootNamespace>dnSpy.MCP.Extension</RootNamespace>
 
 	  <DnSpyDir>D:\Tools\dnSpyEx\bin</DnSpyDir>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\dnSpy.MCP.Protocol\dnSpy.MCP.Protocol.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- dnSpy discovers icons under images/ in the compiled assembly. -->

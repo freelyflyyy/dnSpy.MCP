@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace dnSpy.MCP.Extension.Scripting {
+namespace dnSpy.MCP.Protocol {
     public sealed record ScriptResult(
         bool Success,
         JsonElement? Value,
