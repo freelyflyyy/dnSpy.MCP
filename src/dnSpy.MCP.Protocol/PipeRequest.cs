@@ -1,3 +1,3 @@
-﻿namespace dnSpy.MCP.Extension.Transport {
+﻿namespace dnSpy.MCP.Protocol {
     public sealed record PipeRequest(string Code);
 }

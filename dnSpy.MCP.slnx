@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="src/dnSpy.MCP.Extension/dnSpy.MCP.Extension.csproj" />
+  <Project Path="src/dnSpy.MCP.Protocol/dnSpy.MCP.Protocol.csproj" Id="d13e012f-24d7-484a-a85e-039f38ba4885" />
+  <Project Path="src/dnSpy.MCP.Server/dnSpy.MCP.Server.csproj" Id="27cf2edf-44bc-4856-9da6-efe762ffed21" />
 </Solution>
