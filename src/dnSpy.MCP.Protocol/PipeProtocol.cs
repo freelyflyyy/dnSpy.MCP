@@ -7,10 +7,10 @@ namespace dnSpy.MCP.Protocol {
     public static class PipeProtocol {
         public const int MaxRequestSize = 256 * 1024; // 256 KiB
         public const int MaxResponseSize = 4 * 1024 * 1024; // 4 MiB
-
+        public const string PipeNamePrefix = "dnSpy-Mcp-";
         public static string GetPipeName(int processId) {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(processId);
-            return $"dnSpy-Mcp-{processId}";
+            return $"{PipeNamePrefix}{processId}";
         }
 
         public static async Task<byte[]> ReadMessageAsync(Stream stream, int maxSize, CancellationToken cancellationToken = default) {

@@ -1,4 +1,5 @@
-﻿using dnSpy.MCP.Protocol;
+﻿using dnSpy.MCP.Server.Doc;
+using dnSpy.MCP.Server.Sessions;
 using dnSpy.MCP.Server.Tools;
 using dnSpy.MCP.Server.Transport;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,11 +16,15 @@ if (args.Length == 0) {
     });
 
     builder.Services.AddSingleton<PipeClient>();
+    builder.Services.AddSingleton<SessionDiscovery>();
+    builder.Services.AddSingleton<ApiCatalog>();
 
     builder.Services
         .AddMcpServer()
         .WithStdioServerTransport()
-        .WithTools<ScriptTools>();
+        .WithTools<ScriptTools>()
+        .WithTools<SessionTools>()
+        .WithTools<ApiTools>();
 
     await builder.Build().RunAsync();
     return 0;

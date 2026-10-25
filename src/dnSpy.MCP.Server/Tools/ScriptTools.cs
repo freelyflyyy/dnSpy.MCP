@@ -24,8 +24,9 @@ namespace dnSpy.MCP.Server.Tools {
             + "Globals: ctx.Documents and ctx.Decompiler. "
             + "Use return to produce a JSON-serializable value. "
             + "Cancellation stops waiting, not remote execution. "
-            + "Do not automatically retry after transport failure.")]
-        public async Task<CallToolResult> ExcuteCSharpAsync(
+            + "Do not automatically retry after transport failure."
+            + "Use search_api to look up ctx API signatures and examples. ")]
+        public async Task<CallToolResult> ExecuteCSharpAsync(
             [Description("The target process ID.")]
             int targetProcessId,
             [Description("C# script, for example: return ctx.Documents.ListAssemblies();")]
