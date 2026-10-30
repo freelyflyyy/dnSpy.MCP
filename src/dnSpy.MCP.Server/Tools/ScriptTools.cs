@@ -60,7 +60,6 @@ namespace dnSpy.MCP.Server.Tools {
                     + "Do not automatically retry.",
                     isError: true);
             }
-
         }
 
         private static CallToolResult CreateToolResult(
