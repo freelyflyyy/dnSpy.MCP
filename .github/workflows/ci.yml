@@ -149,6 +149,10 @@ jobs:
         run: |
           ./scripts/build.ps1 -BuildId ci -DnSpyDir $env:CI_DNSPY_BIN
 
+      - name: Test MCP server
+        run: |
+          ./scripts/test-mcp.ps1 -ServerPath './artifacts/build-ci/server/dnSpy.MCP.Server.dll'
+
       - name: Upload package
         uses: actions/upload-artifact@v7.0.2
         with:
