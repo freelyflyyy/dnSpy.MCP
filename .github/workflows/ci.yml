@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+
+  pull_request:
+    branches:
+      - develop
+      - master
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build and package
+    runs-on: windows-2025
+
+    timeout-minutes: 20
+
+    env:
+      CI_DOTNET_VERSION: '10.0.402'
+      CI_DNSPY_VERSION: 'v6.6.0'
+      CI_DNSPY_SHA256: '8ed48f165dc355e869f3a0037ad4f9216147f995a5ae0258b296eeef1f73aab0'
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check PowerShell syntax
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $files = Get-ChildItem -LiteralPath './scripts' -Filter '*.ps1' -File
+
+          if ($files.Count -eq 0) {
+              throw 'No PowerShell scripts were found.'
+          }
+
+          foreach ($file in $files) {
+              Write-Host "[check] Checking $($file.Name)..."
+
+              $tokens = $null
+              $parseErrors = $null
+
+              [System.Management.Automation.Language.Parser]::ParseFile(
+                  $file.FullName,
+                  [ref]$tokens,
+                  [ref]$parseErrors
+              ) | Out-Null
+
+              if ($parseErrors.Count -gt 0) {
+                  foreach ($problem in $parseErrors) {
+                      Write-Host (
+                          "{0}:{1}: {2}" -f
+                          $file.Name,
+                          $problem.Extent.StartLineNumber,
+                          $problem.Message
+                      )
+                  }
+
+                  throw "PowerShell syntax check failed: $($file.Name)"
+              }
+
+              Write-Host "[check] Passed: $($file.Name)"
+          }
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: ${{ env.CI_DOTNET_VERSION }}
+
+      - name: Select CI SDK
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $configuration = @{
+            sdk = @{
+            version = $env:CI_DOTNET_VERSION
+            rollForward = 'disable'
+            allowPrerelease = $false
+            }
+          }
+
+          $configuration |
+            ConvertTo-Json -Depth 3 |
+            Set-Content -LiteralPath './global.json' -Encoding utf8
+
+          dotnet --version
+
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Failed to select the CI SDK.'
+          }
+
+      - name: Download and verify dnSpyEx
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $archivePath = Join-Path $env:RUNNER_TEMP 'dnSpy-net-win64.zip'
+          $hostRoot = Join-Path $env:RUNNER_TEMP "dnspy-$env:CI_DNSPY_VERSION"
+
+          $url = "https://github.com/dnSpyEx/dnSpy/releases/download/$env:CI_DNSPY_VERSION/dnSpy-net-win64.zip"
+
+          Write-Host "[ci] Downloading dnSpyEx $env:CI_DNSPY_VERSION..."
+
+          Invoke-WebRequest `
+              -Uri $url `
+              -OutFile $archivePath `
+              -TimeoutSec 180
+           Write-Host '[ci] Checking SHA256...'
+
+          $actualHash = (
+              Get-FileHash -LiteralPath $archivePath -Algorithm SHA256
+          ).Hash
+
+          if ($actualHash -ine $env:CI_DNSPY_SHA256) {
+              throw "dnSpyEx archive hash mismatch. Actual: $actualHash"
+          }
+
+          Write-Host '[ci] Extracting dnSpyEx...'
+
+          Expand-Archive `
+              -LiteralPath $archivePath `
+              -DestinationPath $hostRoot
+
+          $dnSpyBin = Join-Path $hostRoot 'bin'
+          $contractPath = Join-Path $dnSpyBin 'dnSpy.Contracts.DnSpy.dll'
+
+          if (-not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
+              throw "dnSpy contract DLL was not found: $contractPath"
+          }
+
+          "CI_DNSPY_BIN=$dnSpyBin" |
+              Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          Write-Host "[ci] dnSpy dependencies ready: $dnSpyBin"
+
+      - name: Build and package
+        run: |
+          ./scripts/build.ps1 -BuildId ci -DnSpyDir $env:CI_DNSPY_BIN
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: dnSpy-MCP-windows-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/build-ci/
+          if-no-files-found: error
+          retention-days: 14

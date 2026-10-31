@@ -1,3 +1,41 @@
+<#
+.SYNOPSIS
+Build and package dnSpy.MCP in Release configuration.
+
+.DESCRIPTION
+Use this script to create a Release package from the source repository.
+The package is written relative to the repository, not the current directory:
+  <repository>\artifacts\build-<BuildId>\extension  - files to install in dnSpy
+  <repository>\artifacts\build-<BuildId>\server     - standalone MCP Server
+The complete server directory must be kept together with its dependencies.
+Required files and the two Protocol DLL hashes are checked before success
+is reported. Use install.ps1 when you also want deployment and backups.
+
+.PARAMETER BuildId
+Optional package identifier. If omitted, generates a UTC timestamp and random
+suffix. An existing package directory is rejected rather than overwritten.
+
+.PARAMETER DnSpyDir
+The dnSpyEx .NET 10 bin directory containing the host contract DLLs.
+Defaults to D:\Tools\dnSpyEx\bin. This is NOT the installation root.
+
+.EXAMPLE
+.\scripts\build.ps1 -BuildId local-001 -DnSpyDir 'D:\Tools\dnSpyEx\bin'
+Run from the repository root. Produces artifacts\build-local-001\.
+
+.EXAMPLE
+.\scripts\build.ps1 -DnSpyDir 'D:\Tools\dnSpyEx\bin'
+Generates a new build ID automatically and prints the resulting package path.
+
+.NOTES
+Requires a .NET SDK capable of building the project's .NET 10 targets.
+The published Server requires a .NET 10 Runtime on the destination machine.
+If the chosen BuildId already exists, choose a new ID; it is not overwritten.
+On failure, partial files can remain in that build's artifacts directory.
+Do not deploy a package unless the final package-success message was printed.
+This script does not change the dnSpy installation or create installation backups.
+#>
+
 [CmdletBinding()]
 param(
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')]
