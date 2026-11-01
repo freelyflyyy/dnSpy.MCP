@@ -5,6 +5,8 @@ on:
     branches:
       - develop
       - master
+    tags:
+      - 'v*'
 
   pull_request:
     branches:
@@ -20,6 +22,9 @@ jobs:
   check:
     name: Build and package
     runs-on: windows-2025
+
+    outputs:
+      package-id: ${{ steps.package.outputs.artifact-id }}
 
     timeout-minutes: 20
 
@@ -102,6 +107,38 @@ jobs:
             throw 'Failed to select the CI SDK.'
           }
 
+      - name: Check release version
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if ($env:GITHUB_REF_NAME -cnotmatch '\Av(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z') {
+              throw "Expected a release tag such as v0.1.0: $env:GITHUB_REF_NAME"
+          }
+
+          $expectedVersion = $env:GITHUB_REF_NAME.Substring(1)
+
+          foreach ($name in @('Extension', 'Protocol', 'Server')) {
+              $project = "./src/dnSpy.MCP.$name/dnSpy.MCP.$name.csproj"
+
+              $output = & dotnet msbuild $project `
+                  -nologo `
+                  -p:Configuration=Release `
+                  -getProperty:Version
+
+              if ($LASTEXITCODE -ne 0) {
+                  throw "Failed to read the version of $project"
+              }
+
+              $version = ($output -join "`n").Trim()
+
+              if ($version -cne $expectedVersion) {
+                  throw "Version mismatch: $name is $version, tag expects $expectedVersion"
+              }
+
+              Write-Host "[release] Version verified: $name $version"
+          }
+
       - name: Download and verify dnSpyEx
         run: |
           $ErrorActionPreference = 'Stop'
@@ -154,9 +191,86 @@ jobs:
           ./scripts/test-mcp.ps1 -ServerPath './artifacts/build-ci/server/dnSpy.MCP.Server.dll'
 
       - name: Upload package
+        id: package
         uses: actions/upload-artifact@v7.0.2
         with:
           name: dnSpy-MCP-windows-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/build-ci/
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publish release
+    needs: check
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-2025
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check package ID
+        env:
+          PACKAGE_ID: ${{ needs.check.outputs.package-id }}
+        run: |
+          if ($env:PACKAGE_ID -notmatch '^[1-9][0-9]*$') {
+              throw 'The build job did not provide a valid package ID.'
+          }
+
+      - name: Download tested package
+        uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ needs.check.outputs.package-id }}
+          path: release-package
+
+      - name: Create release archive
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          Copy-Item -LiteralPath './LICENSE.txt' -Destination './release-package'
+
+          $archive = "dnSpy-MCP-$env:GITHUB_REF_NAME-windows.zip"
+
+          Write-Host "[release] Creating $archive..."
+
+          Compress-Archive `
+              -Path './release-package/*' `
+              -DestinationPath $archive
+
+          $hash = (
+              Get-FileHash -LiteralPath $archive -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+
+          "$hash  $archive" |
+              Set-Content -LiteralPath "$archive.sha256" -Encoding utf8
+
+          Write-Host '[release] ZIP and SHA256 file are ready.'
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $archive = "dnSpy-MCP-$env:GITHUB_REF_NAME-windows.zip"
+
+          Write-Host "[release] Publishing $env:GITHUB_REF_NAME..."
+
+          gh release create $env:GITHUB_REF_NAME $archive "$archive.sha256" `
+              --verify-tag `
+              --title "dnSpy.MCP $env:GITHUB_REF_NAME" `
+              --generate-notes
+
+          if ($LASTEXITCODE -ne 0) {
+              throw 'GitHub Release creation failed.'
+          }
