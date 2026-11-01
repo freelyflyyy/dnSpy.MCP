@@ -14,41 +14,52 @@
 
 ---
 
-## Introduction
-**dnSpy.MCP** deeply integrates [**dnSpyEx**](https://github.com/dnSpyEx/dnSpy) with the **Model Context Protocol (MCP)** using a **Code Mode** architecture.
+## Project Overview
 
-Moving away from rigid, traditional "one-tool-per-feature" JSON wrappers, this project embeds the Roslyn C# scripting engine (`Microsoft.CodeAnalysis.CSharp.Scripting`) directly inside the dnSpy process and communicates with the MCP server via Named Pipes. This enables Large Language Models (LLMs) to write and execute `.csx` scripts directly within a running dnSpy instance, unlocking highly flexible .NET reverse engineering and code analysis.
+**dnSpy.MCP** uses a **Code Mode** architecture to integrate [**dnSpyEx**](https://github.com/dnSpyEx/dnSpy) with **MCP**.\
+It moves beyond rigid JSON interfaces that map each feature to a separate tool. By embedding the Roslyn C# scripting engine (`Microsoft.CodeAnalysis.CSharp.Scripting`) inside the dnSpy process and communicating with the MCP server over named pipes, it lets large language models write and execute `.csx` scripts directly inside a running dnSpy instance for flexible .NET reverse engineering and code analysis.
 
-## Features & Advantages
+## Features and Advantages
 
-The project exposes only three core tools:
+The project provides only three basic tools:
 
-| Tool | Description |
+| Tool | Purpose |
 |---|---|
 | `session` | Discover candidate dnSpy named pipes matching the naming convention |
-| `search_api` | Query scripting API signatures, documentation, and usage examples |
+| `search_api` | Look up scripting API signatures, descriptions, and examples |
 | `execute_csharp` | Execute C# scripts inside a target dnSpy instance |
 
-Traditional reverse-engineering MCP plugins rely on predefined, static toolsets (such as `list_assemblies`, `get_types`, or `decompile_method`), which quickly hit bottlenecks during complex analysis. **dnSpy.MCP**'s **Code Mode** takes a different approach:
+Traditional MCP plugins for reverse engineering typically rely on a fixed set of predefined tools, such as `list_assemblies`, `get_types`, and `decompile_method`. This can become a bottleneck in complex analysis tasks. **dnSpy.MCP** takes a different approach with **Code Mode**:
 
-- **Unlimited Expressiveness**  
-  The AI is no longer constrained by hardcoded tool parameters. By executing C# scripts directly inside the dnSpy process, the model can freely combine LINQ queries, conditional branching, loop filtering, and cross-assembly tracing to perform arbitrarily complex reverse-engineering workflows in a single execution.
-- **Maximum Interaction Efficiency**  
-  With traditional tool-calling, locating specific logic inside a large assembly often requires a dozen round-trips, flooding and polluting the context window with intermediate lists. In Code Mode, all traversal, filtering, and aggregation happen in-process inside dnSpy—returning only the exact, final results to the model.
-- **Built-in API Catalog**  
-  To prevent the model from hallucinating non-existent APIs, the server includes a built-in `ApiCatalog` (exposed via the `search_api` tool). Before writing code, the AI can look up exact method signatures and usage examples exposed by the global `dnspy` context on demand.
+* **Unrestricted expressiveness**
+  AI is no longer limited to predefined tool parameters. By executing C# scripts directly inside dnSpy, the model can combine LINQ queries, conditional branches, filtering loops, and tracing across assemblies to carry out complex reverse-engineering workflows in a single execution.
+* **Efficient interaction**
+  With conventional tools, locating specific logic in a large assembly can require a dozen or more tool calls. Large intermediate lists quickly consume tokens and clutter the model's context. With Code Mode, traversal, filtering, and aggregation all happen inside dnSpy, and only the final, relevant results are returned to the model.
+* **Built-in API reference**
+  To help prevent the model from inventing APIs, the server includes an `ApiCatalog`, exposed through the `search_api` tool. Before writing scripts, AI can look up the exact method signatures and usage examples available through the global `ctx` context, helping avoid hallucinated API calls.
+
+## Requirements
+
+| Component | Requirement |
+| :--- | :--- |
+| Operating system | Windows |
+| dnSpy | The dnSpyEx .NET 10 build, currently tested with version 6.6.0. The .NET Framework build is not currently supported. |
+| Runtime | [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). If you already have the .NET 10 SDK or Desktop Runtime, no additional runtime installation is needed. |
+| MCP client | Support for local `stdio` servers, such as Claude Code or Codex |
+
+The requirements above are sufficient to use a release package. Building from source also requires the **.NET 10 SDK**.
 
 ## Learn More
 
-If you are interested in this project and want to dive deeper, check out:
+To learn more about the project, see:
 
-- [**Installation & Setup**](docs/Install.md) — Prerequisites, building from source, extension installation, and MCP client configuration.
-- [**Architecture & Implementation**](docs/Architecture.md) — Named Pipe IPC protocol, Roslyn execution environment, exposed API surface, and .csx script examples.
+* [**Installation and Configuration Guide**](docs/Install.md) — Environment requirements, building from source, installing the dnSpy extension, and configuring MCP clients.
+* [**Architecture and Implementation Details**](docs/Architecture.md) — Named-pipe IPC, the Roslyn scripting environment, the exposed internal APIs, and `.csx` script examples.
 
 ## Security Notice
 
-This project compiles and executes arbitrary C# scripts inside the running dnSpy process over local Named Pipes (restricted to CurrentUserOnly). Use it only in trusted local environments with trusted MCP clients.
+This project allows arbitrary C# code to be dynamically compiled and executed inside the dnSpy process through local named pipes (restricted to the current user with `CurrentUserOnly`). Use it only in trusted local development environments with trusted MCP clients.
 
 ## License
 
-This project is licensed under the GPLv3 License. See [LICENSE](LICENSE.txt) for details.
+This project is open source under the GPLv3 license. See [LICENSE](LICENSE.txt) for details.
