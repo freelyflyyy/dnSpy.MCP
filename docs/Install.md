@@ -3,148 +3,138 @@
 # Installation & Setup
 
 [**English**](Install.md) | [简体中文](Install_CN.md)
+
 </div>
 
----
+## Quick Start
 
-This guide covers building `dnSpy.MCP` from source, deploying the extension and server, and connecting an MCP client. The examples below use `D:\Tools\dnSpyEx` as the dnSpy installation path—adjust it to match your setup.
+These examples use Windows x64 with dnSpy installed at `D:\Tools\dnSpyEx`. Adjust the paths for your setup.
 
-## Prerequisites
+### 1. Prepare the environment
 
-| Component | Requirement |
-| :--- | :--- |
-| Operating System | Windows |
-| dnSpy Host | dnSpyEx `.NET 10` build (tested on v6.6.0; `.NET Framework` builds are not supported) |
-| Build SDK | .NET 10 SDK (with Windows desktop workload) |
-| Server Runtime | System-installed .NET 10 Runtime |
-| MCP Client | Any client supporting local `stdio` MCP servers |
+- Download `dnSpy-net-win64.zip` from [dnSpyEx 6.6.0](https://github.com/dnSpyEx/dnSpy/releases/tag/v6.6.0) and extract it. The extension currently supports the .NET 10 build; .NET Framework builds are not supported.
+- Install the Windows x64 [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Skip this if you already have the .NET 10 SDK or Desktop Runtime.
 
-> **Note:** The extension targets `net10.0-windows`. Also note that dnSpyEx's bundled runtime is private to dnSpy; the standalone MCP server requires a system-wide .NET 10 runtime to run.
+### 2. Install the extension
 
----
+Download `dnSpy-MCP-v<version>-windows.zip` from [Releases](https://github.com/freelyflyyy/dnSpy.MCP/releases) and extract it.
 
-## 1. Build from Source
+Close dnSpy and any MCP clients using this server, then copy:
 
-Clone the repository, open PowerShell in the repo root, and run the build script:
+| Package contents | Destination |
+|---|---|
+| All files inside `extension/` | `D:\Tools\dnSpyEx\bin\Extensions\` |
+| The entire `server/` folder | `D:\Tools\dnSpyEx\server\` |
 
-```powershell
-.\scripts\build.ps1 -BuildId manual-001 -DnSpyDir 'D:\Tools\dnSpyEx\bin'
+Create `Extensions` if it does not exist. Keep all dependencies and subfolders inside `server/`.
+
+### 3. Start using it
+
+1. Launch dnSpy and open the .NET assembly you want to analyze.
+2. Click **View → 打开/关闭管道服务** (Toggle Pipe Service).
+3. Configure your MCP client below, save, and restart the client.
+
+Once connected, ask your AI:
+
+> Use dnspy to list the currently loaded assemblies.
+
+Enable the pipe service again whenever you restart dnSpy.
+
+## Client Configuration
+
+Choose one setup method. Replace the sample dnSpy path, and update `command` if `dotnet.exe` is installed elsewhere.
+
+If you already have a configuration, add or update the `dnspy` entry while keeping your other servers.
+
+<details>
+<summary>Codex</summary>
+
+Add this to `%USERPROFILE%\.codex\config.toml`:
+
+```toml
+[mcp_servers.dnspy]
+command = "C:\\Program Files\\dotnet\\dotnet.exe"
+args = ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"]
+cwd = "D:\\Tools\\dnSpyEx\\server"
 ```
 
-* `-DnSpyDir` must point to the `bin` folder containing `dnSpy.Contracts.DnSpy.dll`, not the root folder where `dnSpy.exe` sits.
-* `-BuildId` is optional. Existing output folders are never overwritten; omit `-BuildId` to generate a timestamped folder automatically, or pass a new name for subsequent builds.
+</details>
 
-The script builds the solution in `Release` mode and stages the output under `artifacts/`:
+<details>
+<summary>Claude Code</summary>
 
-```text
-artifacts/build-manual-001/
-├─ extension/
-└─ server/
+Create or edit `.mcp.json` in the project where you use Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "dnspy": {
+      "type": "stdio",
+      "command": "C:\\Program Files\\dotnet\\dotnet.exe",
+      "args": ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"]
+    }
+  }
+}
 ```
 
----
+Start Claude Code in that project and enable the MCP server when prompted.
 
-## 2. Deploy Extension & Server
+</details>
 
-Before copying files, close dnSpy and stop any MCP client currently running the old server binary.
+<details>
+<summary>CC Switch</summary>
 
-1. Copy everything inside `artifacts/build-manual-001/extension/` to `D:\Tools\dnSpyEx\bin\Extensions\` (create the `Extensions` folder if it doesn't exist).
-2. Copy the entire `artifacts/build-manual-001/server/` folder to `D:\Tools\dnSpyEx\server\`.
-
-Your directory layout should look like this:
-
-```text
-dnSpyEx/
-├─ dnSpy.exe
-├─ bin/
-│  └─ Extensions/
-│     ├─ dnSpy.MCP.Extension.x.dll
-│     ├─ dnSpy.MCP.Extension.x.deps.json
-│     └─ dnSpy.MCP.Protocol.dll
-└─ server/
-   ├─ dnSpy.MCP.Server.dll
-   ├─ dnSpy.MCP.Server.deps.json
-   ├─ dnSpy.MCP.Server.runtimeconfig.json
-   ├─ dnSpy.MCP.Protocol.dll
-   └─ (other published dependencies and runtimes)
-```
-
-> **Updating:** Always update the extension, `dnSpy.MCP.Protocol.dll`, and the `server/` directory together from the same build. Keep all files in `server/` intact—copying `dnSpy.MCP.Server.dll` alone will not work.
-
-Launch `dnSpy.exe`, load any .NET assembly, and click **View → 打开/关闭管道服务** (Toggle Pipe Service) from the top menu. Check the **Output** pane for the active pipe name:
-
-```text
-dnSpy-Mcp-12345
-```
-
-The number at the end is the current dnSpy process ID (PID), which changes every time dnSpy restarts.
-
----
-
-## 3. Configure MCP Client
-
-Point your MCP client at the server using `dotnet.exe`:
-
-| Field | Value |
-| :--- | :--- |
-| Server Name | `dnspy` |
-| Transport | `stdio` |
-| Command | `C:\Program Files\dotnet\dotnet.exe` |
-| Arguments | `D:\Tools\dnSpyEx\server\dnSpy.MCP.Server.dll` |
-
-Example JSON configuration:
+Open MCP management, add a server named `dnspy`, and paste this into the single-server JSON editor:
 
 ```json
 {
   "type": "stdio",
   "command": "C:\\Program Files\\dotnet\\dotnet.exe",
-  "args": [
-    "D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"
-  ]
+  "args": ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"],
+  "cwd": "D:\\Tools\\dnSpyEx\\server"
 }
 ```
 
-If you manage configs with CC Switch, paste the JSON object above into the single-server editor and enable sync for your target client.
+Save, enable synchronization for your target client, and restart that client.
 
-The server starts with no extra CLI flags; target PIDs and scripts are passed dynamically via MCP tool calls. Make sure both the MCP client and dnSpy run under the same Windows user account and privilege level (e.g., both normal or both elevated).
+</details>
 
----
+## Install from Source
 
-## 4. Verify the Setup
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0).
 
-Once connected, your client should see three tools:
+Clone or download this repository and open PowerShell in its root directory. Close dnSpy and any clients using this server, then run:
 
-| Tool | Purpose |
-| :--- | :--- |
-| `search_api` | Query built-in API docs (e.g., search `ListAssemblies` using English keywords). |
-| `session` | List candidate dnSpy PIDs that currently have a pipe open. |
-| `execute_csharp` | Run a C# script inside the specified dnSpy process. |
-
-Test the connection by calling `execute_csharp` (replace `12345` with the PID from `session`):
-
-```json
-{
-  "targetProcessId": 12345,
-  "code": "return 1 + 2;"
-}
+```powershell
+.\scripts\install.ps1 -DnSpyDir 'D:\Tools\dnSpyEx'
 ```
 
-Expected response:
+The script builds and deploys the project, then generates and opens configuration files for Claude Code, Codex, and CC Switch. Add the appropriate configuration to your client and enable the pipe service as described above.
 
-```json
-{"Success":true,"Value":3,"Error":null}
+Pass the **dnSpy installation root**: the folder containing `dnSpy.exe`.
+
+To build a package without installing it:
+
+```powershell
+.\scripts\build.ps1 -DnSpyDir 'D:\Tools\dnSpyEx\bin'
 ```
 
-Next, run `return ctx.Documents.ListAssemblies();` to confirm access to dnSpy's loaded documents (returns `[]` if no assembly is open). If you have multiple dnSpy windows open, verify the target PID before running scripts.
+The build script takes the **`bin` directory**. It prints the output location under `artifacts/build-<id>/`. Copy its contents to the destinations listed in Quick Start.
 
----
+## Updating
+
+Close dnSpy and any clients using this server. Back up the old files, then update the extension files and replace the entire `server/` directory using the same release. Keep other extensions intact.
+
+When installing from source, the installer automatically backs up existing files to:
+
+```text
+<dnSpy installation>\.dnspy-mcp-backups\install-<id>\
+```
 
 ## Troubleshooting
 
-| Issue | What to Check |
-| :--- | :--- |
-| Server fails to start | Check the `dotnet.exe` path, verify .NET 10 Runtime is installed system-wide, and ensure the `server/` folder isn't missing files. |
-| Menu item missing in dnSpy | Confirm you are running the `.NET 10` build of dnSpyEx, verify files are in `bin\Extensions\`, and restart dnSpy. |
-| `session` returns `[]` | Make sure dnSpy is running and **View → 打开/关闭管道服务** has been clicked. |
-| PID shows up, but script fails | The process may have exited, or dnSpy and the MCP client are running at different privilege levels (Admin vs. non-Admin). |
-| Script request times out | A timeout only stops the client from waiting—the script itself may still be running on dnSpy's UI thread. |
+| Problem | Fix |
+|---|---|
+| The client cannot start the server | Check the configured paths, .NET 10 Runtime, and that the entire `server/` folder was copied. |
+| The pipe service menu is missing | Use the .NET 10 build of dnSpyEx, check `bin\Extensions\`, and restart dnSpy. |
+| The AI cannot find a dnSpy session | Enable the pipe service. Run dnSpy and the MCP client under the same Windows account and privilege level. |

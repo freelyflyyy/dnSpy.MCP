@@ -6,146 +6,135 @@
 
 </div>
 
----
+## Quick Start
 
-本文说明如何从源码编译 `dnSpy.MCP`、手动部署插件与 Server，以及接入 MCP 客户端。下文以 `D:\Tools\dnSpyEx` 作为 dnSpy 安装路径示例，操作时请替换为你的实际路径。
+以下以 Windows x64、dnSpy 安装在 `D:\Tools\dnSpyEx` 为例，请按实际情况修改路径。
 
-## 环境要求
+### 1. 准备环境
 
-| 组件 | 要求 |
-| :--- | :--- |
-| 操作系统 | Windows |
-| dnSpy 版本 | dnSpyEx `.NET 10` 构建版（已在 6.6.0 验证；不支持 `.NET Framework` 版） |
-| 编译环境 | .NET 10 SDK（需包含 Windows 桌面开发组件） |
-| Server 运行时 | 系统全局安装的 .NET 10 Runtime |
-| MCP 客户端 | 支持本地 `stdio` 传输的客户端 |
+- 下载 [dnSpyEx 6.6.0](https://github.com/dnSpyEx/dnSpy/releases/tag/v6.6.0) 的 `dnSpy-net-win64.zip`，解压到本地。当前插件适配 .NET 10 版，不支持 .NET Framework 版。
+- 安装 [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) 的 Windows x64 版本。已有 .NET 10 SDK 或 Desktop Runtime 可跳过。
 
-> **注意：** 插件目标框架为 `net10.0-windows`。另外，dnSpyEx 自带的运行时仅供其自身使用，独立的 MCP Server 需要系统安装的 .NET 10 Runtime 才能启动。
+### 2. 安装插件
 
----
+从 [Releases](https://github.com/freelyflyyy/dnSpy.MCP/releases) 下载 `dnSpy-MCP-v<版本>-windows.zip` 并解压。
 
-## 1. 源码编译
+关闭 dnSpy 和正在使用该服务的 MCP 客户端，然后复制：
 
-克隆或下载仓库后，在仓库根目录打开 PowerShell 运行构建脚本：
+| 发布包内容 | 安装位置 |
+|---|---|
+| `extension/` 内的全部文件 | `D:\Tools\dnSpyEx\bin\Extensions\` |
+| 整个 `server/` 文件夹 | `D:\Tools\dnSpyEx\server\` |
 
-```powershell
-.\scripts\build.ps1 -BuildId manual-001 -DnSpyDir 'D:\Tools\dnSpyEx\bin'
+没有 `Extensions` 文件夹就新建。`server/` 中的依赖文件和子目录需要完整保留。
+
+### 3. 开始使用
+
+1. 启动 dnSpy，打开要分析的 .NET 程序集。
+2. 点击 **视图 → 打开/关闭管道服务**。
+3. 按下方说明配置 MCP 客户端，保存后重启客户端。
+
+连接后，可以直接对 AI 说：
+
+> 使用 dnspy 列出当前加载的程序集。
+
+每次重启 dnSpy 后，需要重新打开管道服务。
+
+## 客户端配置
+
+选择自己使用的一种方式即可。替换示例中的 dnSpy 路径；如果 `dotnet.exe` 安装在其他位置，也需要修改 `command`。
+
+已有配置时，添加或更新 `dnspy` 条目，保留其他服务。
+
+<details>
+<summary>Codex</summary>
+
+在 `%USERPROFILE%\.codex\config.toml` 中添加：
+
+```toml
+[mcp_servers.dnspy]
+command = "C:\\Program Files\\dotnet\\dotnet.exe"
+args = ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"]
+cwd = "D:\\Tools\\dnSpyEx\\server"
 ```
 
-* `-DnSpyDir` 必须指向包含 `dnSpy.Contracts.DnSpy.dll` 的 `bin` 目录，而不是外层存放 `dnSpy.exe` 的根目录。
-* `-BuildId` 可选。脚本不会覆盖已有的同名输出目录；省略该参数会自动按时间戳生成目录名，重新构建时也可以指定新的编号。
+</details>
 
-脚本会以 `Release` 模式编译整个解决方案，并将产物整理到 `artifacts/` 下：
+<details>
+<summary>Claude Code</summary>
 
-```text
-artifacts/build-manual-001/
-├─ extension/
-└─ server/
+在你使用 Claude Code 的项目根目录创建或编辑 `.mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "dnspy": {
+      "type": "stdio",
+      "command": "C:\\Program Files\\dotnet\\dotnet.exe",
+      "args": ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"]
+    }
+  }
+}
 ```
 
----
+在该项目中启动 Claude Code，按提示启用此 MCP 服务。
 
-## 2. 部署插件与 Server
+</details>
 
-复制文件前，请先关闭 dnSpy，并断开正在使用旧版 Server 的 MCP 客户端。
+<details>
+<summary>CC Switch</summary>
 
-1. 将 `artifacts/build-manual-001/extension/` 下的所有文件复制到 `D:\Tools\dnSpyEx\bin\Extensions\`（若没有 `Extensions` 文件夹请手动新建）。
-2. 将 `artifacts/build-manual-001/server/` 整个文件夹复制到 `D:\Tools\dnSpyEx\server\`。
-
-部署完成后的目录结构如下：
-
-```text
-dnSpyEx/
-├─ dnSpy.exe
-├─ bin/
-│  └─ Extensions/
-│     ├─ dnSpy.MCP.Extension.x.dll
-│     ├─ dnSpy.MCP.Extension.x.deps.json
-│     └─ dnSpy.MCP.Protocol.dll
-└─ server/
-   ├─ dnSpy.MCP.Server.dll
-   ├─ dnSpy.MCP.Server.deps.json
-   ├─ dnSpy.MCP.Server.runtimeconfig.json
-   ├─ dnSpy.MCP.Protocol.dll
-   └─ 其他发布依赖与子目录
-```
-
-> **版本更新提示：** 升级时请务必使用同一次构建产出的文件，同时替换插件、`dnSpy.MCP.Protocol.dll` 和整个 `server/` 目录。Server 必须保留完整的发布目录，单独复制一个 `dnSpy.MCP.Server.dll` 无法运行。
-
-启动 `dnSpy.exe`，随便拖入一个 .NET 程序集，然后在顶部菜单栏点击 **视图 → 打开/关闭管道服务**。此时底部输出窗口会打印出当前开启的管道名称：
-
-```text
-dnSpy-Mcp-12345
-```
-
-末尾的数字是当前 dnSpy 的进程号（PID），每次重启 dnSpy 后都会变化。
-
----
-
-## 3. 配置 MCP 客户端
-
-在客户端中按以下参数添加 MCP 服务：
-
-| 配置项 | 内容 |
-| :--- | :--- |
-| 服务名称 | `dnspy` |
-| 传输方式 | `stdio` |
-| 启动命令 | `C:\Program Files\dotnet\dotnet.exe` |
-| 启动参数 | `D:\Tools\dnSpyEx\server\dnSpy.MCP.Server.dll` |
-
-单服务 JSON 配置示例：
+打开 MCP 管理，新增名为 `dnspy` 的服务，在单个服务的 JSON 编辑框中填入：
 
 ```json
 {
   "type": "stdio",
   "command": "C:\\Program Files\\dotnet\\dotnet.exe",
-  "args": [
-    "D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"
-  ]
+  "args": ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"],
+  "cwd": "D:\\Tools\\dnSpyEx\\server"
 }
 ```
 
-如果使用 CC Switch 管理配置，把上面这段 JSON 填进单个 MCP 服务的编辑框，再打开对应客户端的同步开关即可。
+保存并启用目标客户端的同步开关，然后重启对应客户端。
 
-这里传入的 DLL 路径是给 `dotnet` 命令使用的，Server 本身不接收命令行启动参数；目标进程 PID 和要跑的脚本都是在后续工具调用时动态传入的。另外，请确保 MCP 客户端与 dnSpy 运行在同一个 Windows 账户及相同的权限级别下（例如同为普通权限，或同为管理员权限）。
+</details>
 
----
+## 从源码安装
 
-## 4. 验证连接
+需要 [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)。
 
-保存配置并刷新客户端连接后，正常情况下会加载出三个工具：
+克隆或下载本仓库，在仓库根目录打开 PowerShell。关闭 dnSpy 和正在使用该服务的客户端，然后执行：
 
-| 工具名 | 用途 |
-| :--- | :--- |
-| `search_api` | 检索内置的脚本 API 文档（文档内容为英文，请用接口名或英文关键词搜索，如 `ListAssemblies`） |
-| `session` | 获取当前开启了管道服务的 dnSpy 候选进程列表 |
-| `execute_csharp` | 在指定的 dnSpy 进程内执行 C# 脚本 |
-
-可以先调一次 `execute_csharp` 做连通性测试（把 `12345` 换成 `session` 查出来的实际 PID）：
-
-```json
-{
-  "targetProcessId": 12345,
-  "code": "return 1 + 2;"
-}
+```powershell
+.\scripts\install.ps1 -DnSpyDir 'D:\Tools\dnSpyEx'
 ```
 
-正常返回如下：
+脚本会完成编译和部署，并生成、打开 Claude Code、Codex 和 CC Switch 的配置文件。将对应内容加入客户端配置，再按上面的步骤启动管道服务。
 
-```json
-{"Success":true,"Value":3,"Error":null}
+这里传入的是 **dnSpy 安装根目录**，即包含 `dnSpy.exe` 的文件夹。
+
+如果只需要构建发布包：
+
+```powershell
+.\scripts\build.ps1 -DnSpyDir 'D:\Tools\dnSpyEx\bin'
 ```
 
-接着可以执行 `return ctx.Documents.ListAssemblies();` 测试能否读到当前打开的程序集列表（若 dnSpy 里没加载任何文件，返回空数组 `[]` 也是正常的）。如果本地同时开了多个 dnSpy 窗口，执行脚本前请先核对目标 PID。
+构建脚本传入的是 **`bin` 目录**。产物位于脚本输出的 `artifacts/build-<编号>/`，按 Quick Start 中的位置复制即可。
 
----
+## 更新版本
 
-## 常见问题排查
+关闭 dnSpy 和正在使用该服务的客户端，备份旧文件后，用同一个版本包更新插件文件，并整体替换 `server/`。保留其他插件。
 
-| 现象 | 排查方向 |
-| :--- | :--- |
-| Server 启动失败 | 检查 `dotnet.exe` 路径是否正确、系统是否装了 .NET 10 Runtime，以及 `server/` 目录文件是否齐全。 |
-| dnSpy 里找不到菜单项 | 确认使用的是 `.NET 10` 版 dnSpyEx，检查 `bin\Extensions\` 下是否漏了 `Protocol.dll`，并重启 dnSpy。 |
-| `session` 返回 `[]` | 确认 dnSpy 已启动，且点击了 **视图 → 打开/关闭管道服务**。 |
-| 能看到候选 PID 但执行报错 | 检查该 dnSpy 进程是否已经关闭，或者客户端与 dnSpy 是否存在权限不一致（一个管理员、一个普通权限）。 |
-| 脚本执行超时 | 超时只会中断客户端侧的等待，已经发过去的脚本可能仍在 dnSpy 内部运行。切勿对包含修改或副作用的脚本做盲目重试。 |
+从源码运行安装脚本时，旧文件会自动备份到：
+
+```text
+<dnSpy安装目录>\.dnspy-mcp-backups\install-<编号>\
+```
+
+## 常见问题
+
+| 问题 | 处理方法 |
+|---|---|
+| 客户端无法启动服务 | 检查配置中的路径、.NET 10 Runtime，以及 `server/` 是否复制完整。 |
+| dnSpy 没有管道服务菜单 | 确认使用 .NET 10 版 dnSpyEx，文件位于 `bin\Extensions\`，然后重启 dnSpy。 |
+| AI 找不到 dnSpy 会话 | 打开管道服务；让 dnSpy 和 MCP 客户端使用同一个 Windows 账户及相同权限级别运行。 |

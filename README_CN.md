@@ -43,6 +43,17 @@
   为防止模型编造不存在的接口，服务端内置了 `ApiCatalog`（提供`search_api` 工具）。AI 在编写代码前可按需查阅全局 `dnspy` 上下文暴露的精确方法签名与调用示例，
   有效消除模型幻觉。
 
+## 环境要求
+
+| 组件 | 要求 |
+| :--- | :--- |
+| 操作系统 | Windows |
+| dnSpy | dnSpyEx .NET 10 版，当前使用 6.6.0 验证（dnSpy .framework 版本暂时不支持） |
+| 运行环境 | [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)，已有 .NET 10 SDK 或 Desktop Runtime 可直接使用 |
+| MCP 客户端 | 支持本地 `stdio`，例如 Claude Code、Codex |
+
+使用发布包只需上述运行环境。从源码构建时，需要安装 **.NET 10 SDK**。
+
 
 ## 深入了解
 
