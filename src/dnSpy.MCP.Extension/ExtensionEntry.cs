@@ -16,7 +16,9 @@ namespace dnSpy.MCP.Extension {
             ShortDescription = "Enable MCP integration for dnSpy"
         };
         public void OnEvent(ExtensionEvent eventType, object? data) {
-            if (eventType == ExtensionEvent.AppExit) {
+            if (eventType == ExtensionEvent.AppLoaded) {
+                host.Start();
+            } else if (eventType == ExtensionEvent.AppExit) {
                 host.RequestStop();
             }
         }

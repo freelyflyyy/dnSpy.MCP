@@ -3,6 +3,7 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
+using static dnSpy.MCP.Server.Transport.PipeClient;
 
 namespace dnSpy.MCP.Server.Tools {
     [McpServerToolType]
@@ -20,18 +21,21 @@ namespace dnSpy.MCP.Server.Tools {
             Idempotent = false,
             OpenWorld = true)]
         [Description(
-            "Execute C# in a running dnSpy instance with its pipe service enabled. "
-            + "Globals: ctx.Documents and ctx.Decompiler. "
-            + "Use return to produce a JSON-serializable value. "
-            + "Cancellation stops waiting, not remote execution. "
-            + "Do not automatically retry after transport failure."
-            + "Use search_api to look up ctx API signatures and examples. ")]
+            "Run C# inside the selected dnSpy process. "
+            + "Pass expectedInstanceId to target a previously selected host; "
+            + "if omitted, the server probes the current host first. "
+            + "Use ctx.Documents or ctx.Decompiler and return a JSON-serializable value. "
+            + "Use search_api for unfamiliar ctx methods. "
+            + "The client waits up to two minutes; cancellation or timeout does not stop a submitted script. "
+            + "Do not retry automatically. After instance_mismatch, verify the intended target before executing again.")]
         public async Task<CallToolResult> ExecuteCSharpAsync(
-            [Description("The target process ID.")]
+            [Description("Target dnSpy process ID (PID).")]
             int targetProcessId,
-            [Description("C# script, for example: return ctx.Documents.ListAssemblies();")]
+            [Description("C# script body, e.g.: return ctx.Documents.ListAssemblies();")]
             string code,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken,
+            [Description("Host InstanceId from session(targetProcessId). Pass this to pin execution to the verified dnSpy instance and avoid redundant handshakes.")]
+            Guid? expectedInstanceId = null) {
 
             using var requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             requestTimeout.CancelAfter(TimeSpan.FromMinutes(2));
@@ -40,7 +44,8 @@ namespace dnSpy.MCP.Server.Tools {
                 var result = await client.ExecuteAsync(
                     targetProcessId,
                     code,
-                    requestTimeout.Token);
+                    requestTimeout.Token,
+                    expectedInstanceId);
 
                 return CreateToolResult(
                     JsonSerializer.Serialize(result),
@@ -53,6 +58,12 @@ namespace dnSpy.MCP.Server.Tools {
                    "request_timeout: Stopped waiting for dnSpy. "
                    + "The script may still be running. Do not automatically retry.",
                    isError: true);
+            } catch (PipeRemoteException ex) {
+                return CreateToolResult(
+                    $"dnspy_error: {ex.Message}. Do not retry automatically.",
+                    isError: true);
+            } catch (NotSupportedException ex) {
+                return CreateToolResult(ex.Message, isError: true);
             } catch (Exception ex) {
                 return CreateToolResult(
                     $"transport_error: {ex.GetType().Name}: {ex.Message} "

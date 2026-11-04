@@ -1,66 +1,90 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-      <TargetFramework>net10.0-windows</TargetFramework>
+	<PropertyGroup>
+		<TargetFrameworks>net10.0-windows;net48</TargetFrameworks>
+	  <LangVersion>10.0</LangVersion>
 	  <UseWPF>true</UseWPF>
-      <ImplicitUsings>enable</ImplicitUsings>
+	    <ImplicitUsings>enable</ImplicitUsings>
 	  <Nullable>enable</Nullable>
 
 	  <AssemblyName>dnSpy.MCP.Extension.x</AssemblyName>
 	  <RootNamespace>dnSpy.MCP.Extension</RootNamespace>
 
-	  <DnSpyDir>D:\Tools\dnSpyEx\bin</DnSpyDir>
-  </PropertyGroup>
+	  <DnSpyNet10Dir Condition="'$(DnSpyNet10Dir)' == ''">D:\Tools\dnSpyEx\bin</DnSpyNet10Dir>
+	  <DnSpyNet48Dir Condition="'$(DnSpyNet48Dir)' == ''">D:\Tools\dnSpyEx-NetFramework\bin</DnSpyNet48Dir>
 
-  <ItemGroup>
-    <ProjectReference Include="..\dnSpy.MCP.Protocol\dnSpy.MCP.Protocol.csproj" />
-  </ItemGroup>
+	  <DnSpyReferenceDir Condition="'$(TargetFramework)' == 'net10.0-windows'">$(DnSpyNet10Dir)</DnSpyReferenceDir>
+	  <DnSpyReferenceDir Condition="'$(TargetFramework)' == 'net48'">$(DnSpyNet48Dir)</DnSpyReferenceDir>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <!-- dnSpy discovers icons under images/ in the compiled assembly. -->
+	<ItemGroup>
+	  <ProjectReference Include="..\dnSpy.MCP.Protocol\dnSpy.MCP.Protocol.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <!-- dnSpy discovers icons under images/ in the compiled assembly. -->
 	  <Page Update="Resources\Images\icon_mcp.xaml">
 		  <Link>Images\icon_mcp.xaml</Link>
 	  </Page>
-  </ItemGroup>
+	</ItemGroup>
 
-  <ItemGroup>
+	<ItemGroup>
 	  <Reference Include="dnSpy.Contracts.DnSpy">
-		  <HintPath>$(DnSpyDir)\dnSpy.Contracts.DnSpy.dll</HintPath>
+		  <HintPath>$(DnSpyReferenceDir)\dnSpy.Contracts.DnSpy.dll</HintPath>
 		  <Private>False</Private>
 	  </Reference>
 	  <Reference Include="dnSpy.Contracts.Logic">
-		  <HintPath>$(DnSpyDir)\dnSpy.Contracts.Logic.dll</HintPath>
-		  <Private>False</Private>
-	  </Reference>
-	  <Reference Include="System.ComponentModel.Composition">
-		  <HintPath>$(DnSpyDir)\System.ComponentModel.Composition.dll</HintPath>
+		  <HintPath>$(DnSpyReferenceDir)\dnSpy.Contracts.Logic.dll</HintPath>
 		  <Private>False</Private>
 	  </Reference>
 	  <Reference Include="dnlib">
-		  <HintPath>$(DnSpyDir)\dnlib.dll</HintPath>
+		  <HintPath>$(DnSpyReferenceDir)\dnlib.dll</HintPath>
 		  <Private>false</Private>
 	  </Reference>
 	  <Reference Include="Microsoft.VisualStudio.CoreUtility">
-		  <HintPath>$(DnSpyDir)\Microsoft.VisualStudio.CoreUtility.dll</HintPath>
+		  <HintPath>$(DnSpyReferenceDir)\Microsoft.VisualStudio.CoreUtility.dll</HintPath>
 		  <Private>false</Private>
 	  </Reference>
 	  <!-- Script Component -->
 	  <Reference Include="Microsoft.CodeAnalysis">
-		  <HintPath>$(DnSpyDir)\Microsoft.CodeAnalysis.dll</HintPath>
+		  <HintPath>$(DnSpyReferenceDir)\Microsoft.CodeAnalysis.dll</HintPath>
 		  <Private>false</Private>
 	  </Reference>
 	  <Reference Include="Microsoft.CodeAnalysis.CSharp">
-		  <HintPath>$(DnSpyDir)\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+		  <HintPath>$(DnSpyReferenceDir)\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
 		  <Private>false</Private>
 	  </Reference>
 	  <Reference Include="Microsoft.CodeAnalysis.Scripting">
-		  <HintPath>$(DnSpyDir)\Microsoft.CodeAnalysis.Scripting.dll</HintPath>
+		  <HintPath>$(DnSpyReferenceDir)\Microsoft.CodeAnalysis.Scripting.dll</HintPath>
 		  <Private>false</Private>
 	  </Reference>
 	  <Reference Include="Microsoft.CodeAnalysis.CSharp.Scripting">
-		  <HintPath>$(DnSpyDir)\Microsoft.CodeAnalysis.CSharp.Scripting.dll</HintPath>
+		  <HintPath>$(DnSpyReferenceDir)\Microsoft.CodeAnalysis.CSharp.Scripting.dll</HintPath>
 		  <Private>false</Private>
 	  </Reference>
-  </ItemGroup>
+	</ItemGroup>
 
+	<!-- Framework-specific references -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+		<Reference Include="System.ComponentModel.Composition">
+			<HintPath>$(DnSpyReferenceDir)\System.ComponentModel.Composition.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+		<Reference Include="System.ComponentModel.Composition">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="System.Text.Json">
+			<HintPath>$(DnSpyReferenceDir)\System.Text.Json.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="System.Memory">
+			<HintPath>$(DnSpyReferenceDir)\System.Memory.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="System.Collections.Immutable">
+			<HintPath>$(DnSpyReferenceDir)\System.Collections.Immutable.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
 </Project>

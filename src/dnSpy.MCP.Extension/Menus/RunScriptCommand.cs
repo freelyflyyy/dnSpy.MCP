@@ -8,18 +8,17 @@ using System.Text.Json;
 
 namespace dnSpy.MCP.Extension.Menus {
     [ExportMenuItem(
-        OwnerGuid = MenuConstants.APP_MENU_VIEW_GUID,
-        Header = "运行 C# 脚本",
+        OwnerGuid = McpMenuIds.Root,
+        Header = "Execute C# Script",
         Icon = "icon_mcp",
-        Group = MenuConstants.GROUP_APP_MENU_VIEW_WINDOWS,
-        Order = 1000
-        )]
-    public sealed class ServerMenus : MenuItemBase {
+        Group = McpMenuIds.ToolsGroup,
+        Order = 10)]
+    public sealed class RunScriptCommand : MenuItemBase {
         private readonly ScriptExecutor script;
         private readonly McpOutput output;
 
         [ImportingConstructor]
-        public ServerMenus(ScriptExecutor script, McpOutput output) {
+        public RunScriptCommand(ScriptExecutor script, McpOutput output) {
             this.script = script;
             this.output = output;
         }
@@ -27,8 +26,8 @@ namespace dnSpy.MCP.Extension.Menus {
         public override async void Execute(IMenuItemContext context) {
             try {
                 var dialog = new OpenFileDialog {
-                    Title = "选择要运行的 C# 脚本",
-                    Filter = "C# 脚本 (*.csx)|*.csx",
+                    Title = "Select C# Script to Execute",
+                    Filter = "C# Scripts (*.csx)|*.csx",
                     CheckFileExists = true,
                     Multiselect = false
                 };
@@ -37,8 +36,10 @@ namespace dnSpy.MCP.Extension.Menus {
                     return;
                 }
 
-                var uiThreadId = Environment.CurrentManagedThreadId;
-                var code = await File.ReadAllTextAsync(dialog.FileName);
+                string code;
+                using (var reader = new StreamReader(dialog.FileName)) {
+                    code = await reader.ReadToEndAsync();
+                }
                 var result = await Task.Run(() => script.ExecuteAsync(code));
 
                 var json = JsonSerializer.Serialize(
@@ -47,13 +48,10 @@ namespace dnSpy.MCP.Extension.Menus {
                         WriteIndented = true
                     });
 
-                output.WriteResult(
-                    $"UI 线程 ID：{uiThreadId}"
-                    + Environment.NewLine
-                    + json);
+                output.WriteResult(json);
             } catch (Exception ex) {
                 output.WriteResult(
-                    $"读取脚本文件或显示结果失败：{ex.GetType().Name}"
+                    $"Failed to read script file or display result: {ex.GetType().Name}"
                     + Environment.NewLine
                     + ex.Message);
             }
