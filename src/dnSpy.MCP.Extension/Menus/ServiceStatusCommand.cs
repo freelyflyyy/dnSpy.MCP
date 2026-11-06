@@ -60,9 +60,9 @@ namespace dnSpy.MCP.Extension.Menus {
         Group = McpMenuIds.ServiceGroup,
         Order = 0)]
     internal sealed class ViewLogsCommand : MenuItemBase {
-        private readonly McpOutput output;
+        private readonly McpOutputView outputView;
         [ImportingConstructor]
-        public ViewLogsCommand(McpOutput output) => this.output = output;
-        public override void Execute(IMenuItemContext context) => output.Show();
+        public ViewLogsCommand(McpOutputView outputView) => this.outputView = outputView;
+        public override void Execute(IMenuItemContext context) => outputView.Show();
     }
 }

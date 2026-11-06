@@ -1,8 +1,10 @@
 ﻿using dnSpy.MCP.Extension.Api;
+using dnSpy.MCP.Logging;
 using dnSpy.MCP.Protocol;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using System.ComponentModel.Composition;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Windows.Threading;
 
@@ -45,7 +47,43 @@ namespace dnSpy.MCP.Extension.Scripting {
             await executionGate.WaitAsync();
 
             try {
-                return await ExecuteCoreAsync(code);
+                var watch = Stopwatch.StartNew();
+                var result = await ExecuteCoreAsync(code);
+                watch.Stop();
+
+                string preview;
+
+                try {
+                    if (result.Success) {
+                        preview = result.Value is JsonElement json
+                            ? json.GetRawText()
+                            : result.Value is null ? "null" : "<preview unavailable>";
+                    } else {
+                        preview = result.Error?.Message ?? "Unknown error";
+
+                        if (result.Error?.Diagnostics is { Length: > 0 }) {
+                            preview += "; " + result.Error.Diagnostics[0];
+                        }
+                    }
+                } catch (Exception ex) {
+                    preview = $"<preview unavailable: {ex.GetType().Name}>";
+                }
+
+                if (result.Success) {
+                    Log.i(
+                        "Script.Completed",
+                        "script=" + code,
+                        preview,
+                        watch.ElapsedMilliseconds);
+                } else {
+                    Log.e(
+                        "Script.Failed",
+                        $"{result.Error?.Code}; script={code}",
+                        preview,
+                        watch.ElapsedMilliseconds);
+                }
+
+                return result;
             } finally {
                 executionGate.Release();
             }

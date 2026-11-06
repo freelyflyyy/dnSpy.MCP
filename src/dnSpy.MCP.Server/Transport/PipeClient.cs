@@ -1,5 +1,4 @@
 ﻿using dnSpy.MCP.Protocol;
-using ModelContextProtocol.Protocol;
 using System.IO.Pipes;
 using System.Text.Json;
 

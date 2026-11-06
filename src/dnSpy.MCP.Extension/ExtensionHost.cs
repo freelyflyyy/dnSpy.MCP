@@ -1,8 +1,8 @@
 ﻿using dnSpy.MCP.Extension.Transport;
 using dnSpy.MCP.Extension.UI;
+using dnSpy.MCP.Logging;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
-using System.Windows.Documents;
 using System.Windows.Threading;
 
 namespace dnSpy.MCP.Extension {
@@ -10,7 +10,6 @@ namespace dnSpy.MCP.Extension {
     [PartCreationPolicy(CreationPolicy.Shared)]
     public sealed class ExtensionHost {
         private readonly PipeServer server;
-        private readonly McpOutput output;
         private readonly Dispatcher dispatcher;
 
         private CancellationTokenSource? stopSource;
@@ -24,9 +23,8 @@ namespace dnSpy.MCP.Extension {
         public bool CanStop => State is ServiceState.Starting or ServiceState.Running;
 
         [ImportingConstructor]
-        public ExtensionHost(PipeServer server, McpOutput output) {
+        public ExtensionHost(PipeServer server) {
             this.server = server;
-            this.output = output;
 
             dispatcher = System.Windows.Application.Current?.Dispatcher
                 ?? throw new InvalidOperationException("The WPF application is unavailable.");
@@ -44,7 +42,7 @@ namespace dnSpy.MCP.Extension {
             LastError = null;
             State = ServiceState.Starting;
 
-            Log("MCP service is starting.");
+            Log.i("Service.Starting", "MCP service is starting.");
             completion = RunObservedAsync(source);
         }
 
@@ -55,7 +53,7 @@ namespace dnSpy.MCP.Extension {
             }
 
             State = ServiceState.Stopping;
-            Log("MCP service is stopping. Accepted scripts may still be running.");
+            Log.i("Service.Stopping", "Accepted scripts may still be running.");
             stopSource.Cancel();
         }
 
@@ -77,7 +75,7 @@ namespace dnSpy.MCP.Extension {
                 }
 
                 State = ServiceState.Running;
-                Log($"MCP service is running: {PipeName}");
+                Log.i("Service.Running", $"MCP service is running: {PipeName}");
             }));
         }
 
@@ -108,20 +106,10 @@ namespace dnSpy.MCP.Extension {
                 source.Dispose();
             }
 
-            Log(failure is null
-                ? "MCP service stopped."
-                : $"MCP service failed: {LastError}");
-        }
-
-        private void Log(string message) {
-            if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished) {
-                return;
-            }
-
-            try {
-                output.Write(message);
-            } catch (Exception ex) {
-                Trace.WriteLine($"[dnSpy.MCP] {message}\nOutput error: {ex}");
+            if (failure is null) {
+                Log.i("Service.Stopped", "MCP service stopped.");
+            } else {
+                Log.e("Service.Faulted", $"MCP service failed: {LastError}");
             }
         }
     }

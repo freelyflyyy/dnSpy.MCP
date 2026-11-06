@@ -3,6 +3,7 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
+using dnSpy.MCP.Logging;
 using static dnSpy.MCP.Server.Transport.PipeClient;
 
 namespace dnSpy.MCP.Server.Tools {
@@ -52,19 +53,24 @@ namespace dnSpy.MCP.Server.Tools {
                     isError: !result.Success);
             } catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested) {
+                Log.w("Client.WaitCancelled", "Stopped waiting; a submitted script may still be running.");
                 throw;
             } catch (OperationCanceledException) {
+                Log.w("Client.WaitTimedOut", "Stopped waiting; a submitted script may still be running.");
                 return CreateToolResult(
                    "request_timeout: Stopped waiting for dnSpy. "
                    + "The script may still be running. Do not automatically retry.",
                    isError: true);
             } catch (PipeRemoteException ex) {
+                Log.w("Client.RemoteError", ex.Message);
                 return CreateToolResult(
                     $"dnspy_error: {ex.Message}. Do not retry automatically.",
                     isError: true);
             } catch (NotSupportedException ex) {
+                Log.w("Client.ProtocolMismatch", ex.Message);
                 return CreateToolResult(ex.Message, isError: true);
             } catch (Exception ex) {
+                Log.e("Client.TransportFailed", ex.ToString());
                 return CreateToolResult(
                     $"transport_error: {ex.GetType().Name}: {ex.Message} "
                     + "If the request was sent, the script may still be running. "

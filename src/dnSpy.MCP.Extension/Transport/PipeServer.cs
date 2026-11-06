@@ -1,4 +1,5 @@
 ﻿using dnSpy.MCP.Extension.Scripting;
+using dnSpy.MCP.Logging;
 using dnSpy.MCP.Protocol;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
@@ -46,11 +47,11 @@ namespace dnSpy.MCP.Extension.Transport {
                     when (stopToken.IsCancellationRequested) {
                     return;
                 } catch (OperationCanceledException) {
-                    Trace.WriteLine("Client request timed out.");
+                    Log.w("Transport.ReceiveTimeout", "The client did not finish sending its request.");
                 } catch (Exception ex)
                     when (ex is IOException or InvalidDataException) {
 
-                    Trace.WriteLine($"Client request failed: {ex.GetType().Name}: {ex.Message}");
+                    Log.e("Transport.RequestFailed", $"{ex.GetType().Name}: {ex.Message}");
                 }
             }
         }
@@ -116,8 +117,8 @@ namespace dnSpy.MCP.Extension.Transport {
                     try {
                         return Reply(id, await scripts.ExecuteAsync(request.Script!));
                     } catch (Exception ex) {
-                        Trace.WriteLine(ex);
-                        return Reject(id, "host_error");
+                    Log.e("Script.HostError", ex.ToString());
+                    return Reject(id, "host_error");
                     }
 
                 default:

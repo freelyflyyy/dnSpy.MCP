@@ -17,6 +17,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\dnSpy.MCP.Logging\dnSpy.MCP.Logging.csproj" />
 	  <ProjectReference Include="..\dnSpy.MCP.Protocol\dnSpy.MCP.Protocol.csproj" />
 	</ItemGroup>
 
