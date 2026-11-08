@@ -1,7 +1,9 @@
-﻿using dnSpy.MCP.Server.Doc;
+﻿using dnSpy.MCP.Logging;
+using dnSpy.MCP.Server.Doc;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace dnSpy.MCP.Server.Tools {
@@ -33,12 +35,34 @@ namespace dnSpy.MCP.Server.Tools {
             [Description("Maximum entries to return (1 to 20, default 5). Set to 20 when browsing with an empty query.")]
             int limit = 5) {
 
+            var watch = Stopwatch.StartNew();
+
             try {
-                return JsonSerializer.Serialize(
-                    catalog.Search(query, limit));
+                var entries = catalog.Search(query, limit);
+                var json = JsonSerializer.Serialize(entries);
+
+                watch.Stop();
+
+                Log.i(
+                    "Api.SearchCompleted",
+                    $"limit={limit}; count={entries.Length}; query={query}",
+                    elapsedMs: watch.ElapsedMilliseconds);
+
+                return json;
             } catch (ArgumentException ex) {
-                throw new McpException(
-                    $"invalid_request: {ex.Message}");
+                Log.w(
+                    "Api.SearchRejected",
+                    ex.Message,
+                    elapsedMs: watch.ElapsedMilliseconds);
+
+                throw new McpException($"invalid_request: {ex.Message}");
+            } catch (Exception ex) {
+                Log.e(
+                    "Api.SearchFailed",
+                    ex.ToString(),
+                    elapsedMs: watch.ElapsedMilliseconds);
+
+                throw;
             }
         }
     }

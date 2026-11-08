@@ -1,4 +1,6 @@
-﻿namespace dnSpy.MCP.Logging {
+﻿using Microsoft.Extensions.Logging;
+
+namespace dnSpy.MCP.Logging {
     public static class Log {
 
         private static Logger? current;
@@ -12,7 +14,6 @@
                     "Logging is already initialized.");
             }
         }
-
         public static void i(
             string eventName,
             string message,
@@ -20,7 +21,7 @@
             long? elapsedMs = null) {
 
             Volatile.Read(ref current)?.Write(
-                LogLevel.Info,
+                LogLevel.Information,
                 eventName,
                 message,
                 result,

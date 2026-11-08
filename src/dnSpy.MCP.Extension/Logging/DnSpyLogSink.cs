@@ -1,6 +1,8 @@
 ﻿using dnSpy.Contracts.Text;
 using dnSpy.MCP.Extension.UI;
 using dnSpy.MCP.Logging;
+using dnSpy.MCP.Logging.Extensions.Formatting;
+using Microsoft.Extensions.Logging;
 using System.ComponentModel.Composition;
 
 namespace dnSpy.MCP.Extension.Logging {
@@ -8,6 +10,7 @@ namespace dnSpy.MCP.Extension.Logging {
     [PartCreationPolicy(CreationPolicy.Shared)]
     internal sealed class DnSpyLogSink : ILogSink {
         private readonly McpOutput output;
+        private readonly ILogEntryFormatter formatter = new SimpleTextFormatter();
 
         [ImportingConstructor]
         public DnSpyLogSink(McpOutput output) {
@@ -18,11 +21,12 @@ namespace dnSpy.MCP.Extension.Logging {
             var color = entry.Level switch {
                 LogLevel.Warning => TextColor.Yellow,
                 LogLevel.Error => TextColor.Error,
+                LogLevel.Critical => TextColor.Error,
                 _ => TextColor.Text
             };
 
             output.WriteLine(
-                TextLogFormatter.Format(entry),
+                formatter.Format(entry),
                 color);
         }
     }

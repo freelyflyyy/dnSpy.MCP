@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace dnSpy.MCP.Logging {
     public sealed class Logger {
@@ -30,14 +31,18 @@ namespace dnSpy.MCP.Logging {
                     : Clip(result, out resultCut);
 
                 var entry = new LogEntry(
-                    time,
-                    level,
-                    eventName,
-                    text,
-                    preview,
-                    elapsedMs,
-                    messageCut,
-                    resultCut);
+                    Timestamp: time,
+                    Level: level,
+                    Category: "dnSpy.MCP",
+                    EventId: new EventId(0, eventName),
+                    MessageTemplate: null,
+                    FormattedMessage: text,
+                    Properties: new Dictionary<string, object?> {
+                        ["ResultPreview"] = preview,
+                        ["ElapsedMs"] = elapsedMs,
+                        ["MessageTruncated"] = messageCut,
+                        ["ResultTruncated"] = resultCut
+                    });
 
                 sink.Write(entry);
             } catch (Exception ex) {
