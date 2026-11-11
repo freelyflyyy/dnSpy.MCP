@@ -5,7 +5,7 @@ namespace dnSpy.MCP.Logging.Providers {
         private readonly string category;
         private readonly SinkLoggerProvider provider;
 
-        public SinkLogger(string category, SinkLoggerProvider provider) {
+        internal SinkLogger(string category, SinkLoggerProvider provider) {
             this.category = category;
             this.provider = provider;
         }
