@@ -1,4 +1,5 @@
 ﻿using dnSpy.MCP.Logging;
+using dnSpy.MCP.Logging.Extensions.TextWriter;
 using dnSpy.MCP.Server.Doc;
 using dnSpy.MCP.Server.Sessions;
 using dnSpy.MCP.Server.Tools;
@@ -15,10 +16,11 @@ if (args.Length == 0) {
 
     builder.Logging.ClearProviders();
     builder.Logging.SetMinimumLevel(
-            Microsoft.Extensions.Logging.LogLevel.Warning);
+            LogLevel.Warning);
     builder.Logging.AddConsole(options => {
         options.LogToStandardErrorThreshold =
-            Microsoft.Extensions.Logging.LogLevel.Trace;
+
+        LogLevel.Trace;
     });
 
     builder.Services.AddSingleton<PipeClient>();

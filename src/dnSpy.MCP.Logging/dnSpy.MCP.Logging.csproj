@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFrameworks>netstandard2.0;net48</TargetFrameworks>
 		<LangVersion>10.0</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
@@ -10,5 +10,6 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
 		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.13" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.13" />
 	</ItemGroup>
 </Project>
