@@ -56,107 +56,110 @@ namespace dnSpy.MCP.Server.Tools {
                 watch.Stop();
 
                 if (result.Success) {
-                    Log.i(
+                    Log.I<ScriptTools>(
                         "Tool.ExecuteCompleted",
-                        $"pid={targetProcessId}; success=true",
-                        elapsedMs: watch.ElapsedMilliseconds);
+                        "Script execution completed: pid={ProcessId}; success={Success}; elapsed={ElapsedMs}ms",
+                        targetProcessId, true, watch.ElapsedMilliseconds);
                 } else {
-                    Log.w(
+                    Log.W<ScriptTools>(
                         "Tool.ScriptFailed",
-                        $"pid={targetProcessId}; error={result.Error?.Code}",
-                        elapsedMs: watch.ElapsedMilliseconds);
+                        "Script execution failed: pid={ProcessId}; error={ErrorCode}; elapsed={ElapsedMs}ms",
+                        targetProcessId, result.Error?.Code, watch.ElapsedMilliseconds);
                 }
 
                 return CreateToolResult(json, isError: !result.Success);
             } catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested) {
 
-                Log.w(
+                Log.W<ScriptTools>(
                     "Client.WaitCancelled",
-                    $"pid={targetProcessId}; stopped waiting; a submitted script may still be running.",
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "Stopped waiting for pid={ProcessId}; a submitted script may still be running; elapsed={ElapsedMs}ms",
+                    targetProcessId, watch.ElapsedMilliseconds);
 
                 throw;
             } catch (OperationCanceledException) {
-                Log.w(
+                Log.W<ScriptTools>(
                     "Client.WaitTimedOut",
-                    $"pid={targetProcessId}; stopped waiting; a submitted script may still be running.",
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "Timed out waiting for pid={ProcessId}; a submitted script may still be running; elapsed={ElapsedMs}ms",
+                    targetProcessId, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(
                     "request_timeout: Stopped waiting for dnSpy. "
                     + "The script may still be running. Do not automatically retry.",
                     isError: true);
             } catch (ArgumentException ex) {
-                Log.w(
+                Log.W<ScriptTools>(
                     "Tool.ExecuteRejected",
-                    ex.Message,
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "Script request rejected: {Message}; pid={ProcessId}; elapsed={ElapsedMs}ms",
+                    ex.Message, targetProcessId, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(
                     $"invalid_request: {ex.Message}",
                     isError: true);
             } catch (TimeoutException ex) {
-                Log.w(
+                Log.W<ScriptTools>(
                     "Client.Unresponsive",
-                    $"pid={targetProcessId}; {ex.Message}",
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "Host is unresponsive: pid={ProcessId}; {Message}; elapsed={ElapsedMs}ms",
+                    targetProcessId, ex.Message, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(
                     $"host_unresponsive: {ex.Message}",
                     isError: true);
             } catch (UnauthorizedAccessException ex) {
-                Log.w(
+                Log.W<ScriptTools>(
                     "Client.AccessDenied",
-                    $"pid={targetProcessId}; {ex.Message}",
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "Host access denied: pid={ProcessId}; {Message}; elapsed={ElapsedMs}ms",
+                    targetProcessId, ex.Message, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(
                     $"access_denied: {ex.Message}",
                     isError: true);
             } catch (PipeRemoteException ex) {
-                Log.w(
+                Log.W<ScriptTools>(
                     "Client.RemoteError",
-                    ex.Message,
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "Host reported an error: {Message}; pid={ProcessId}; elapsed={ElapsedMs}ms",
+                    ex.Message, targetProcessId, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(
                     $"dnspy_error: {ex.Message}. Do not retry automatically.",
                     isError: true);
             } catch (NotSupportedException ex) {
-                Log.w(
+                Log.W<ScriptTools>(
                     "Client.ProtocolMismatch",
-                    ex.Message,
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "Host protocol mismatch: {Message}; pid={ProcessId}; elapsed={ElapsedMs}ms",
+                    ex.Message, targetProcessId, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(ex.Message, isError: true);
             } catch (Exception ex) when (
                 ex is JsonException or InvalidDataException) {
 
-                Log.e(
+                Log.E<ScriptTools>(
                     "Client.InvalidResponse",
-                    $"pid={targetProcessId}; {ex}",
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    ex,
+                    "Invalid host response: pid={ProcessId}; elapsed={ElapsedMs}ms",
+                    targetProcessId, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(
                     $"invalid_response: {ex.Message}. "
                     + "A submitted script may have executed. Do not retry automatically.",
                     isError: true);
             } catch (IOException ex) {
-                Log.e(
+                Log.E<ScriptTools>(
                     "Client.TransportFailed",
-                    $"pid={targetProcessId}; {ex}",
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    ex,
+                    "Host transport failed: pid={ProcessId}; elapsed={ElapsedMs}ms",
+                    targetProcessId, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(
                     $"transport_error: {ex.Message}. "
                     + "A submitted script may have executed. Do not retry automatically.",
                     isError: true);
             } catch (Exception ex) {
-                Log.e(
+                Log.E<ScriptTools>(
                     "Tool.ExecuteFailed",
-                    $"pid={targetProcessId}; {ex}",
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    ex,
+                    "Script request failed: pid={ProcessId}; elapsed={ElapsedMs}ms",
+                    targetProcessId, watch.ElapsedMilliseconds);
 
                 return CreateToolResult(
                     $"request_failed: {ex.Message}. Do not retry automatically.",

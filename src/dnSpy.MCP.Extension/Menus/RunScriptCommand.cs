@@ -43,7 +43,10 @@ namespace dnSpy.MCP.Extension.Menus {
                 outputView.Show();
                 await script.ExecuteAsync(code);
             } catch (Exception ex) {
-                Log.e("Script.MenuFailed", ex.ToString());
+                Log.E<RunScriptCommand>(
+                    "Script.MenuFailed",
+                    ex,
+                    "Failed to execute the selected script.");
                 outputView.Show();
             }
         }

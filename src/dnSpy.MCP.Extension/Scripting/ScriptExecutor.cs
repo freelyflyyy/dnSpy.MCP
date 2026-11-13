@@ -52,35 +52,33 @@ namespace dnSpy.MCP.Extension.Scripting {
                 watch.Stop();
 
                 string preview;
-
                 try {
                     if (result.Success) {
-                        preview = result.Value is JsonElement json
-                            ? json.GetRawText()
-                            : result.Value is null ? "null" : "<preview unavailable>";
+                        preview = result.Value switch {
+                            JsonElement json => json.GetRawText(),
+                            null => "null",
+                            _ => "<preview unavailable>"
+                        };
                     } else {
                         preview = result.Error?.Message ?? "Unknown error";
-
-                        if (result.Error?.Diagnostics is { Length: > 0 }) {
-                            preview += "; " + result.Error.Diagnostics[0];
+                        if (result.Error?.Diagnostics is { Length: > 0 } diag) {
+                            preview += "; " + diag[0];
                         }
                     }
-                } catch (Exception ex) {
-                    preview = $"<preview unavailable: {ex.GetType().Name}>";
+                } catch (Exception previewError) {
+                    preview = $"<preview unavailable: {previewError.GetType().Name}>";
                 }
 
                 if (result.Success) {
-                    Log.i(
+                    Log.I<ScriptExecutor>(
                         "Script.Completed",
-                        "script=" + code,
-                        preview,
-                        watch.ElapsedMilliseconds);
+                        "Script completed: {Script}; result={ResultPreview}; elapsed={ElapsedMs}ms",
+                        code, preview, watch.ElapsedMilliseconds);
                 } else {
-                    Log.e(
+                    Log.E<ScriptExecutor>(
                         "Script.Failed",
-                        $"{result.Error?.Code}; script={code}",
-                        preview,
-                        watch.ElapsedMilliseconds);
+                        "Script failed ({ErrorCode}): {Script}; result={ResultPreview}; elapsed={ElapsedMs}ms",
+                        result.Error?.Code, code, preview, watch.ElapsedMilliseconds);
                 }
 
                 return result;

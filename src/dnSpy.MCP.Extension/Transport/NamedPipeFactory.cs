@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 
 #if NET48
 using System.Security.Principal;

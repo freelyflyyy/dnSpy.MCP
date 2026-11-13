@@ -43,24 +43,25 @@ namespace dnSpy.MCP.Server.Tools {
 
                 watch.Stop();
 
-                Log.i(
+                Log.I<ApiTools>(
                     "Api.SearchCompleted",
-                    $"limit={limit}; count={entries.Length}; query={query}",
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "API search completed: limit={Limit}; count={Count}; query={Query}; elapsed={ElapsedMs}ms",
+                    limit, entries.Length, query, watch.ElapsedMilliseconds);
 
                 return json;
             } catch (ArgumentException ex) {
-                Log.w(
+                Log.W<ApiTools>(
                     "Api.SearchRejected",
-                    ex.Message,
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    "API search rejected: {Message}; limit={Limit}; query={Query}; elapsed={ElapsedMs}ms",
+                    ex.Message, limit, query, watch.ElapsedMilliseconds);
 
                 throw new McpException($"invalid_request: {ex.Message}");
             } catch (Exception ex) {
-                Log.e(
+                Log.E<ApiTools>(
                     "Api.SearchFailed",
-                    ex.ToString(),
-                    elapsedMs: watch.ElapsedMilliseconds);
+                    ex,
+                    "API search failed: limit={Limit}; query={Query}; elapsed={ElapsedMs}ms",
+                    limit, query, watch.ElapsedMilliseconds);
 
                 throw;
             }

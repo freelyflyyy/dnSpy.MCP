@@ -47,11 +47,16 @@ namespace dnSpy.MCP.Extension.Transport {
                     when (stopToken.IsCancellationRequested) {
                     return;
                 } catch (OperationCanceledException) {
-                    Log.w("Transport.ReceiveTimeout", "The client did not finish sending its request.");
+                    Log.W<PipeServer>(
+                        "Transport.ReceiveTimeout",
+                        "The client did not finish sending its request.");
                 } catch (Exception ex)
                     when (ex is IOException or InvalidDataException) {
 
-                    Log.e("Transport.RequestFailed", $"{ex.GetType().Name}: {ex.Message}");
+                    Log.E<PipeServer>(
+                        "Transport.RequestFailed",
+                        ex,
+                        "The client request could not be processed.");
                 }
             }
         }
@@ -91,6 +96,7 @@ namespace dnSpy.MCP.Extension.Transport {
 
             var id = request.RequestId;
 
+
             if (request.ProtocolVersion != PipeProtocol.Version) {
                 return Reject(id, "incompatible_protocol");
             }
@@ -106,21 +112,25 @@ namespace dnSpy.MCP.Extension.Transport {
                         return Reject(id, "invalid_request");
                     }
                     return Reply(id, hostInfo);
-                    case PipeProtocol.Execute:
-                        if(request.ExpectedInstanceId != hostInfo.InstanceId) {
-                            return Reject(id, "instance_mismatch");
-                        }
+
+                case PipeProtocol.Execute:
+                    if(request.ExpectedInstanceId != hostInfo.InstanceId) {
+                        return Reject(id, "instance_mismatch");
+                    }
                     if (string.IsNullOrWhiteSpace(request.Script)) {
                         return Reject(id, "invalid_request");
                     }
-
                     try {
                         return Reply(id, await scripts.ExecuteAsync(request.Script!));
                     } catch (Exception ex) {
-                    Log.e("Script.HostError", ex.ToString());
-                    return Reject(id, "host_error");
-                    }
+                        Log.E<PipeServer>(
+                            "Script.HostError",
+                            ex,
+                            "The script request {RequestId} failed in the host.",
+                            id);
 
+                        return Reject(id, "host_error");
+                    }
                 default:
                     return Reject(id, "unknown_operation");
             }
