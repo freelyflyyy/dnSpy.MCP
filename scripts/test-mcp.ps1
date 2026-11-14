@@ -9,14 +9,17 @@ param (
 $ErrorActionPreference = 'Stop'
 
 $serverFile = Get-Item -LiteralPath $ServerPath
-if ($serverFile.PSIsContainer -or $serverFile.Extension -ne '.dll') {
-    <# Action to perform if the condition is true #>
-    throw "Expected a server DLL: $ServerPath"
+if ($serverFile.PSIsContainer -or $serverFile.Extension -notin @('.dll', '.exe')) {
+    throw "Expected a server DLL or EXE: $ServerPath"
 }
 
 $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-$startInfo.FileName = (Get-Command dotnet -CommandType Application).Source
-$startInfo.ArgumentList.Add($serverFile.FullName)
+if ($serverFile.Extension -eq '.exe') {
+    $startInfo.FileName = $serverFile.FullName
+} else {
+    $startInfo.FileName = (Get-Command dotnet -CommandType Application).Source
+    $startInfo.ArgumentList.Add($serverFile.FullName)
+}
 $startInfo.WorkingDirectory = $serverFile.DirectoryName
 $startInfo.UseShellExecute = $false
 $startInfo.CreateNoWindow = $true
@@ -29,8 +32,11 @@ $process = [System.Diagnostics.Process]::new()
 $process.StartInfo = $startInfo
 $started = $false
 
-function Send-McpMessage{
-    param([hashtable]$Message)
+function Send-McpMessage {
+    param (
+        [hashtable]
+        $Message
+    )
 
     $json = ConvertTo-Json -InputObject $Message -Depth 20 -Compress
     $process.StandardInput.WriteLine($json)
@@ -39,9 +45,14 @@ function Send-McpMessage{
 
 function Invoke-McpRequest {
     param (
-        [int]$Id,
-        [string]$Method,
-        [hashtable]$Parameters = @{}
+        [int]
+        $Id,
+
+        [string]
+        $Method,
+
+        [hashtable]
+        $Parameters = @{}
     )
 
     Send-McpMessage @{
@@ -131,7 +142,9 @@ try {
     Write-Host '[test] [3/5] Checking registered tools...'
 
     $result = Invoke-McpRequest -Id 2 -Method 'tools/list'
-    $toolNames = @($result.tools | ForEach-Object { $_.name })
+    $toolNames = @($result.tools | ForEach-Object {
+        $_.name
+    })
 
     foreach ($expected in @('session', 'search_api', 'execute_csharp')) {
         if ($toolNames -cnotcontains $expected) {
@@ -150,13 +163,14 @@ try {
         }
     }
 
-     if ($searchResult.isError -eq $true) {
+    if ($searchResult.isError -eq $true) {
         throw 'search_api returned an error for a valid query.'
     }
 
     $textBlocks = @(
-        $searchResult.content | Where-Object { $_.type -ceq 'text' }
-    )
+        $searchResult.content | Where-Object {
+            $_.type -ceq 'text'
+        })
 
     if ($textBlocks.Count -ne 1) {
         throw 'Expected one text result from search_api.'
@@ -186,16 +200,19 @@ try {
 
     $errorText = (
         $invalidResult.content |
-            Where-Object { $_.type -ceq 'text' } |
-            ForEach-Object { $_.text }
-    ) -join "`n"
+        Where-Object {
+            $_.type -ceq 'text'
+        } |
+        ForEach-Object {
+            $_.text
+        }) -join "`n"
 
     if ($errorText -notlike '*invalid_request:*') {
         throw 'search_api did not return the expected invalid_request error.'
     }
 
 } finally {
-   if ($started) {
+    if ($started) {
         $process.StandardInput.Close()
 
         if (-not $process.WaitForExit(5000)) {

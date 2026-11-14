@@ -48,8 +48,8 @@
 | 组件 | 要求 |
 | :--- | :--- |
 | 操作系统 | Windows |
-| dnSpy | dnSpyEx .NET 10 版，当前使用 6.6.0 验证（dnSpy .framework 版本暂时不支持） |
-| 运行环境 | [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)，已有 .NET 10 SDK 或 Desktop Runtime 可直接使用 |
+| dnSpy | dnSpyEx 6.6.0 的 .NET 10 或 .NET Framework 4.8 版，下载对应的 Windows x64 包 |
+| 运行环境 | 发布包内 Server 自带运行时；Framework 版 dnSpy 本身仍需 .NET Framework 4.8 |
 | MCP 客户端 | 支持本地 `stdio`，例如 Claude Code、Codex |
 
 使用发布包只需上述运行环境。从源码构建时，需要安装 **.NET 10 SDK**。

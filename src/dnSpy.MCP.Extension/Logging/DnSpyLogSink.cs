@@ -1,5 +1,4 @@
-﻿using dnSpy.Contracts.Text;
-using dnSpy.MCP.Extension.UI;
+﻿using dnSpy.MCP.Extension.UI;
 using dnSpy.MCP.Logging;
 using System.ComponentModel.Composition;
 
@@ -19,6 +18,7 @@ namespace dnSpy.MCP.Extension.Logging {
             if (entry is null) {
                 throw new ArgumentNullException(nameof(entry));
             }
+
 
             output.WriteLine(
                 formatter.Format(entry),

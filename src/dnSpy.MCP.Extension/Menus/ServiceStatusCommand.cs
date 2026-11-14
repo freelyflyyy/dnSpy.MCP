@@ -1,4 +1,5 @@
-﻿using dnSpy.Contracts.Menus;
+﻿using dnSpy.Contracts.Images;
+using dnSpy.Contracts.Menus;
 using dnSpy.MCP.Extension.UI;
 using System.ComponentModel.Composition;
 
@@ -7,6 +8,7 @@ namespace dnSpy.MCP.Extension.Menus {
         OwnerGuid = McpMenuIds.Root,
         Header = "Service Status",
         Group = McpMenuIds.ServiceGroup,
+        Icon = "icon_mcp",
         Order = 0)]
     [PartCreationPolicy(CreationPolicy.Shared)]
     public sealed class ServiceStatusCommand : MenuItemBase {
@@ -24,7 +26,7 @@ namespace dnSpy.MCP.Extension.Menus {
                 _ => "MCP Status: Unknown State"
             };
         public override bool IsEnabled(IMenuItemContext context) => false;
-        public async override void Execute(IMenuItemContext context) {
+        public override void Execute(IMenuItemContext context) {
         }
     }
 
@@ -32,6 +34,7 @@ namespace dnSpy.MCP.Extension.Menus {
         OwnerGuid = McpMenuIds.Root,
         Header = "Start Service",
         Group = McpMenuIds.ServiceGroup,
+        Icon = DsImagesAttribute.Run,
         Order = 10)]
     internal sealed class StartServiceCommand : MenuItemBase {
         private readonly ExtensionHost host;
@@ -45,6 +48,7 @@ namespace dnSpy.MCP.Extension.Menus {
         OwnerGuid = McpMenuIds.Root,
         Header = "Stop Service",
         Group = McpMenuIds.ServiceGroup,
+        Icon = DsImagesAttribute.Stop,
         Order = 20)]
     internal sealed class StopServiceCommand : MenuItemBase {
         private readonly ExtensionHost host;
@@ -58,6 +62,7 @@ namespace dnSpy.MCP.Extension.Menus {
         OwnerGuid = McpMenuIds.Root,
         Header = "View Logs",
         Group = McpMenuIds.ServiceGroup,
+        Icon = DsImagesAttribute.Output,
         Order = 0)]
     internal sealed class ViewLogsCommand : MenuItemBase {
         private readonly McpOutputView outputView;

@@ -1,4 +1,5 @@
-﻿using dnSpy.Contracts.Menus;
+﻿using dnSpy.Contracts.Images;
+using dnSpy.Contracts.Menus;
 using dnSpy.MCP.Extension.Scripting;
 using dnSpy.MCP.Extension.UI;
 using dnSpy.MCP.Logging;
@@ -10,7 +11,7 @@ namespace dnSpy.MCP.Extension.Menus {
     [ExportMenuItem(
         OwnerGuid = McpMenuIds.Root,
         Header = "Execute C# Script",
-        Icon = "icon_mcp",
+        Icon = DsImagesAttribute.RunOutline,
         Group = McpMenuIds.ToolsGroup,
         Order = 10)]
     public sealed class RunScriptCommand : MenuItemBase {
