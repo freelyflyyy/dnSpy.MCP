@@ -1,10 +1,13 @@
-﻿using System.Text.Json;
-
-namespace dnSpy.MCP.Protocol {
-    public sealed record ScriptResult(
-        bool Success,
-        JsonElement? Value,
-        ScriptError? Error) {
+﻿namespace dnSpy.MCP.Protocol {
+    public sealed class ScriptResult {
+        public bool Success { get; }
+        public object? Value { get; }
+        public ScriptError? Error { get; }
+        public ScriptResult(bool Success, object? Value, ScriptError? Error) {
+            this.Success = Success;
+            this.Value = Value;
+            this.Error = Error;
+        }
 
         public static ScriptResult Failure(
             string code,

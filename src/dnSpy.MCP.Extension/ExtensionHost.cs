@@ -1,5 +1,5 @@
 ﻿using dnSpy.MCP.Extension.Transport;
-using dnSpy.MCP.Extension.UI;
+using dnSpy.MCP.Logging;
 using System.ComponentModel.Composition;
 using System.Windows.Threading;
 
@@ -8,19 +8,21 @@ namespace dnSpy.MCP.Extension {
     [PartCreationPolicy(CreationPolicy.Shared)]
     public sealed class ExtensionHost {
         private readonly PipeServer server;
-        private readonly McpOutput output;
         private readonly Dispatcher dispatcher;
 
         private CancellationTokenSource? stopSource;
         private Task completion = Task.CompletedTask;
 
-        public bool IsRunning { get; private set; }
+        public ServiceState State { get; private set; } = ServiceState.Stopped;
+        public string? LastError { get; private set; }
         public string PipeName => server.PipeName;
 
+        public bool CanStart => State is ServiceState.Stopped or ServiceState.Faulted;
+        public bool CanStop => State is ServiceState.Starting or ServiceState.Running;
+
         [ImportingConstructor]
-        public ExtensionHost(PipeServer server, McpOutput output) {
+        public ExtensionHost(PipeServer server) {
             this.server = server;
-            this.output = output;
 
             dispatcher = System.Windows.Application.Current?.Dispatcher
                 ?? throw new InvalidOperationException("The WPF application is unavailable.");
@@ -29,20 +31,32 @@ namespace dnSpy.MCP.Extension {
         public void Start() {
             dispatcher.VerifyAccess();
 
-            if (IsRunning) {
+            if (!CanStart) {
                 return;
             }
 
-            IsRunning = true;
-
             var source = new CancellationTokenSource();
             stopSource = source;
+            LastError = null;
+            State = ServiceState.Starting;
+
+            Log.I<ExtensionHost>(
+                "Service.Starting",
+                "MCP service is starting.");
             completion = RunObservedAsync(source);
         }
 
         public void RequestStop() {
             dispatcher.VerifyAccess();
-            stopSource?.Cancel();
+            if (!CanStop || stopSource is null) {
+                return;
+            }
+
+            State = ServiceState.Stopping;
+            Log.I<ExtensionHost>(
+                "Service.Stopping",
+                "Accepted scripts may still be running.");
+            stopSource.Cancel();
         }
 
         public Task StopAsync() {
@@ -50,25 +64,64 @@ namespace dnSpy.MCP.Extension {
             return completion;
         }
 
-        private async Task RunObservedAsync(CancellationTokenSource source) {
-            var message = "Pipe server stopped.";
-            try {
-                await Task.Run(() => server.RunAsync(source.Token));
-            } catch (OperationCanceledException)
-                when (source.IsCancellationRequested) {
-            } catch (Exception ex) {
-                message =
-                    $"Pipe server exited unexpectedly: {ex.GetType().Name}"
-                    + Environment.NewLine
-                    + ex.Message;
+        private void NotifyListening(CancellationTokenSource source) {
+            if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished) {
+                return;
+            }
+            dispatcher.BeginInvoke(new Action(() => {
+                // Handle the listening notification
+                if (!ReferenceEquals(source, stopSource)
+                    || State != ServiceState.Starting
+                    || source.IsCancellationRequested) {
+                    return;
+                }
 
+                State = ServiceState.Running;
+                Log.I<ExtensionHost>(
+                    "Service.Running",
+                    "MCP service is running: {PipeName}",
+                    PipeName);
+            }));
+        }
+
+        private async Task RunObservedAsync(CancellationTokenSource source) {
+            Exception? failure = null;
+
+            try {
+                await Task.Run(() => server.RunAsync(
+                    source.Token, () => NotifyListening(source)));
+            }catch(OperationCanceledException)
+                when (source.IsCancellationRequested) {
+                // Normal cancellation
+            } catch (Exception ex) {
+                failure = ex;
             } finally {
-                stopSource = null;
-                IsRunning = false;
+                if (ReferenceEquals(stopSource, source)) {
+                    stopSource = null;
+
+                    LastError = failure is null
+                        ? null
+                        : $"{failure.GetType().Name}: {failure.Message}";
+
+                    State = failure is null
+                        ? ServiceState.Stopped
+                        : ServiceState.Faulted;
+                }
+
                 source.Dispose();
             }
 
-            output.WriteResult(message);
+            if (failure is null) {
+                Log.I<ExtensionHost>(
+                    "Service.Stopped",
+                    "MCP service stopped.");
+            } else {
+                Log.E<ExtensionHost>(
+                    "Service.Faulted",
+                    failure,
+                    "MCP service failed: {LastError}",
+                    LastError);
+            }
         }
     }
 }

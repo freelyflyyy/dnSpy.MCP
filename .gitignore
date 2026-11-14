@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Logging source directory
+!/src/dnSpy.MCP.Logging/Extensions/Debug/
+!/src/dnSpy.MCP.Logging/Extensions/Debug/*.cs

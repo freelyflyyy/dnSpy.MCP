@@ -43,8 +43,8 @@ Traditional MCP plugins for reverse engineering typically rely on a fixed set of
 | Component | Requirement |
 | :--- | :--- |
 | Operating system | Windows |
-| dnSpy | The dnSpyEx .NET 10 build, currently tested with version 6.6.0. The .NET Framework build is not currently supported. |
-| Runtime | [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). If you already have the .NET 10 SDK or Desktop Runtime, no additional runtime installation is needed. |
+| dnSpy | dnSpyEx 6.6.0, .NET 10 or .NET Framework 4.8; choose the matching Windows x64 package. |
+| Runtime | The packaged Server is self-contained. Framework dnSpy still requires .NET Framework 4.8. |
 | MCP client | Support for local `stdio` servers, such as Claude Code or Codex |
 
 The requirements above are sufficient to use a release package. Building from source also requires the **.NET 10 SDK**.

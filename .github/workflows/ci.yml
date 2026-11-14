@@ -1,18 +1,10 @@
 name: CI
-
 on:
   push:
-    branches:
-      - develop
-      - master
-    tags:
-      - 'v*'
-
+    branches: [develop, master]
+    tags: ['v*']
   pull_request:
-    branches:
-      - develop
-      - master
-
+    branches: [develop, master]
   workflow_dispatch:
 
 permissions:
@@ -20,182 +12,92 @@ permissions:
 
 jobs:
   check:
-    name: Build and package
+    name: Build and test (${{ matrix.host }})
     runs-on: windows-2025
-
-    outputs:
-      package-id: ${{ steps.package.outputs.artifact-id }}
-
-    timeout-minutes: 20
-
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: net10
+            archive: dnSpy-net-win64.zip
+            sha256: 8ed48f165dc355e869f3a0037ad4f9216147f995a5ae0258b296eeef1f73aab0
+          - host: net48
+            archive: dnSpy-netframework.zip
+            sha256: 2eadb7f4931ad1882d10477cf57185d288cacc6e3abf9958e7ae73c0a0f31dd1
     env:
       CI_DOTNET_VERSION: '10.0.402'
       CI_DNSPY_VERSION: 'v6.6.0'
-      CI_DNSPY_SHA256: '8ed48f165dc355e869f3a0037ad4f9216147f995a5ae0258b296eeef1f73aab0'
-
     defaults:
       run:
         shell: pwsh
-
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-
       - name: Check PowerShell syntax
         run: |
           $ErrorActionPreference = 'Stop'
-
-          $files = Get-ChildItem -LiteralPath './scripts' -Filter '*.ps1' -File
-
-          if ($files.Count -eq 0) {
-              throw 'No PowerShell scripts were found.'
-          }
-
-          foreach ($file in $files) {
-              Write-Host "[check] Checking $($file.Name)..."
-
+          foreach ($file in Get-ChildItem ./scripts -Filter '*.ps1' -File) {
               $tokens = $null
-              $parseErrors = $null
-
-              [System.Management.Automation.Language.Parser]::ParseFile(
-                  $file.FullName,
-                  [ref]$tokens,
-                  [ref]$parseErrors
-              ) | Out-Null
-
-              if ($parseErrors.Count -gt 0) {
-                  foreach ($problem in $parseErrors) {
-                      Write-Host (
-                          "{0}:{1}: {2}" -f
-                          $file.Name,
-                          $problem.Extent.StartLineNumber,
-                          $problem.Message
-                      )
-                  }
-
-                  throw "PowerShell syntax check failed: $($file.Name)"
+              $errors = $null
+              [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+              if ($errors.Count) {
+                  throw "$($file.Name): $($errors -join '; ')"
               }
-
-              Write-Host "[check] Passed: $($file.Name)"
           }
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v6.0.0
+      - uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: ${{ env.CI_DOTNET_VERSION }}
-
-      - name: Select CI SDK
+      - name: Select SDK and verify release version
         run: |
           $ErrorActionPreference = 'Stop'
-
-          $configuration = @{
-            sdk = @{
-            version = $env:CI_DOTNET_VERSION
-            rollForward = 'disable'
-            allowPrerelease = $false
-            }
-          }
-
-          $configuration |
-            ConvertTo-Json -Depth 3 |
-            Set-Content -LiteralPath './global.json' -Encoding utf8
-
+          @{
+              sdk = @{
+                  version = $env:CI_DOTNET_VERSION
+                  rollForward = 'disable'
+                  allowPrerelease = $false
+              }
+          } |
+              ConvertTo-Json -Depth 3 | Set-Content ./global.json -Encoding utf8
           dotnet --version
-
           if ($LASTEXITCODE -ne 0) {
-            throw 'Failed to select the CI SDK.'
+              throw 'SDK selection failed.'
           }
-
-      - name: Check release version
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+              if ($env:GITHUB_REF_NAME -cnotmatch '\Av(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z') {
+                  throw 'Expected vX.Y.Z.'
+              }
+              foreach ($name in @('Extension', 'Protocol', 'Logging', 'Server')) {
+                  $version = & dotnet msbuild "./src/dnSpy.MCP.$name/dnSpy.MCP.$name.csproj" -nologo -getProperty:Version
+                  if ($LASTEXITCODE -ne 0 -or ($version -join "`n").Trim() -cne $env:GITHUB_REF_NAME.Substring(1)) {
+                      throw "Version mismatch: $name"
+                  }
+              }
+          }
+      - name: Download and verify host
+        env:
+          HOST_ARCHIVE: ${{ matrix.archive }}
+          HOST_SHA256: ${{ matrix.sha256 }}
         run: |
           $ErrorActionPreference = 'Stop'
-
-          if ($env:GITHUB_REF_NAME -cnotmatch '\Av(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z') {
-              throw "Expected a release tag such as v0.1.0: $env:GITHUB_REF_NAME"
+          $zip = Join-Path $env:RUNNER_TEMP $env:HOST_ARCHIVE
+          $root = Join-Path $env:RUNNER_TEMP 'dnspy-host'
+          Invoke-WebRequest "https://github.com/dnSpyEx/dnSpy/releases/download/$env:CI_DNSPY_VERSION/$env:HOST_ARCHIVE" -OutFile $zip -TimeoutSec 180
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ine $env:HOST_SHA256) {
+              throw 'Host archive checksum mismatch.'
           }
-
-          $expectedVersion = $env:GITHUB_REF_NAME.Substring(1)
-
-          foreach ($name in @('Extension', 'Protocol', 'Server')) {
-              $project = "./src/dnSpy.MCP.$name/dnSpy.MCP.$name.csproj"
-
-              $output = & dotnet msbuild $project `
-                  -nologo `
-                  -p:Configuration=Release `
-                  -getProperty:Version
-
-              if ($LASTEXITCODE -ne 0) {
-                  throw "Failed to read the version of $project"
-              }
-
-              $version = ($output -join "`n").Trim()
-
-              if ($version -cne $expectedVersion) {
-                  throw "Version mismatch: $name is $version, tag expects $expectedVersion"
-              }
-
-              Write-Host "[release] Version verified: $name $version"
-          }
-
-      - name: Download and verify dnSpyEx
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          $archivePath = Join-Path $env:RUNNER_TEMP 'dnSpy-net-win64.zip'
-          $hostRoot = Join-Path $env:RUNNER_TEMP "dnspy-$env:CI_DNSPY_VERSION"
-
-          $url = "https://github.com/dnSpyEx/dnSpy/releases/download/$env:CI_DNSPY_VERSION/dnSpy-net-win64.zip"
-
-          Write-Host "[ci] Downloading dnSpyEx $env:CI_DNSPY_VERSION..."
-
-          Invoke-WebRequest `
-              -Uri $url `
-              -OutFile $archivePath `
-              -TimeoutSec 180
-           Write-Host '[ci] Checking SHA256...'
-
-          $actualHash = (
-              Get-FileHash -LiteralPath $archivePath -Algorithm SHA256
-          ).Hash
-
-          if ($actualHash -ine $env:CI_DNSPY_SHA256) {
-              throw "dnSpyEx archive hash mismatch. Actual: $actualHash"
-          }
-
-          Write-Host '[ci] Extracting dnSpyEx...'
-
-          Expand-Archive `
-              -LiteralPath $archivePath `
-              -DestinationPath $hostRoot
-
-          $dnSpyBin = Join-Path $hostRoot 'bin'
-          $contractPath = Join-Path $dnSpyBin 'dnSpy.Contracts.DnSpy.dll'
-
-          if (-not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
-              throw "dnSpy contract DLL was not found: $contractPath"
-          }
-
-          "CI_DNSPY_BIN=$dnSpyBin" |
-              Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          Write-Host "[ci] dnSpy dependencies ready: $dnSpyBin"
-
-      - name: Build and package
-        run: |
-          ./scripts/build.ps1 -BuildId ci -DnSpyDir $env:CI_DNSPY_BIN
-
-      - name: Test MCP server
-        run: |
-          ./scripts/test-mcp.ps1 -ServerPath './artifacts/build-ci/server/dnSpy.MCP.Server.dll'
-
-      - name: Upload package
-        id: package
+          Expand-Archive -LiteralPath $zip -DestinationPath $root
+          "CI_DNSPY_BIN=$(Join-Path $root 'bin')" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build flat package
+        run: ./scripts/build.ps1 -BuildId ci-${{ matrix.host }} -HostRuntime ${{ matrix.host }} -DnSpyDir $env:CI_DNSPY_BIN
+      - name: Test package and Windows PowerShell installer
+        run: ./scripts/test-package.ps1 -PackageDir ./artifacts/build-ci-${{ matrix.host }} -DnSpyDir $env:CI_DNSPY_BIN
+      - name: Upload tested package
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: dnSpy-MCP-windows-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/build-ci/
+          name: mcp-package-${{ matrix.host }}
+          path: artifacts/build-ci-${{ matrix.host }}/
           if-no-files-found: error
           retention-days: 14
 
@@ -205,72 +107,72 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: windows-2025
     timeout-minutes: 10
-
     permissions:
       contents: write
-
     defaults:
       run:
         shell: pwsh
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v8.0.2
         with:
-          persist-credentials: false
-
-      - name: Check package ID
-        env:
-          PACKAGE_ID: ${{ needs.check.outputs.package-id }}
-        run: |
-          if ($env:PACKAGE_ID -notmatch '^[1-9][0-9]*$') {
-              throw 'The build job did not provide a valid package ID.'
-          }
-
-      - name: Download tested package
-        uses: actions/download-artifact@v8.0.2
-        with:
-          artifact-ids: ${{ needs.check.outputs.package-id }}
-          path: release-package
-
-      - name: Create release archive
+          pattern: mcp-package-*
+          path: release-packages
+          merge-multiple: false
+      
+      - name: Extract release notes from package
         run: |
           $ErrorActionPreference = 'Stop'
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $changelogPath = './release-packages/mcp-package-net10/CHANGELOG.md'
+          
+          $changelog = Get-Content -LiteralPath $changelogPath -Raw -Encoding utf8
+          $pattern = "(?ms)^##\s+\[?$([regex]::Escape($version))\]?[^\r\n]*\r?\n(.*?)(?=^##\s|\z)"
+          if ($changelog -match $pattern) {
+              $notes = $matches[1].Trim()
+          } else {
+              $notes = "dnSpy.MCP $env:GITHUB_REF_NAME"
+          }
+          Set-Content -LiteralPath './release-notes.md' -Value $notes -Encoding utf8
 
-          Copy-Item -LiteralPath './LICENSE.txt' -Destination './release-package'
-
-          $archive = "dnSpy-MCP-$env:GITHUB_REF_NAME-windows.zip"
-
-          Write-Host "[release] Creating $archive..."
-
-          Compress-Archive `
-              -Path './release-package/*' `
-              -DestinationPath $archive
-
-          $hash = (
-              Get-FileHash -LiteralPath $archive -Algorithm SHA256
-          ).Hash.ToLowerInvariant()
-
-          "$hash  $archive" |
-              Set-Content -LiteralPath "$archive.sha256" -Encoding utf8
-
-          Write-Host '[release] ZIP and SHA256 file are ready.'
-
+      - name: Create archives from the tested packages
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory release-assets | Out-Null
+          foreach ($runtime in @('net10', 'net48')) {
+              $folder = Join-Path './release-packages' "mcp-package-$runtime"
+              $manifest = Get-Content (Join-Path $folder 'package.json') -Raw | ConvertFrom-Json
+              if ($manifest.hostRuntime -ne $runtime -or $manifest.version -cne $env:GITHUB_REF_NAME.Substring(1)) {
+                  throw 'Unexpected release artifact.'
+              }
+              foreach ($file in $manifest.files) {
+                  if ($file.name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or $file.name -match '\.\.') {
+                      throw 'Invalid filename.'
+                  }
+                  if ((Get-FileHash -LiteralPath (Join-Path $folder $file.name) -Algorithm SHA256).Hash -ine $file.sha256) {
+                      throw 'Artifact checksum mismatch.'
+                  }
+              }
+              $suffix = if ($runtime -eq 'net48') {
+                  '-net48'
+              } else {
+                  ''
+              }
+              $archive = Join-Path './release-assets' "dnSpy-MCP-$env:GITHUB_REF_NAME$suffix-windows.zip"
+              Compress-Archive -Path "$folder/*" -DestinationPath $archive
+              $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+              "$hash  $([IO.Path]::GetFileName($archive))" | Set-Content -LiteralPath "$archive.sha256" -Encoding ascii
+          }
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
-
-          $archive = "dnSpy-MCP-$env:GITHUB_REF_NAME-windows.zip"
-
-          Write-Host "[release] Publishing $env:GITHUB_REF_NAME..."
-
-          gh release create $env:GITHUB_REF_NAME $archive "$archive.sha256" `
-              --verify-tag `
-              --title "dnSpy.MCP $env:GITHUB_REF_NAME" `
-              --generate-notes
-
+          $assets = @(Get-ChildItem ./release-assets -File | ForEach-Object FullName)
+          if ($assets.Count -ne 4) {
+              throw 'Expected two ZIPs and two checksums.'
+          }
+          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --title "dnSpy.MCP $env:GITHUB_REF_NAME" --notes-file ./release-notes.md
           if ($LASTEXITCODE -ne 0) {
-              throw 'GitHub Release creation failed.'
+              throw 'Release creation failed.'
           }

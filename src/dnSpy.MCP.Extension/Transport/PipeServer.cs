@@ -1,6 +1,6 @@
 ﻿using dnSpy.MCP.Extension.Scripting;
+using dnSpy.MCP.Logging;
 using dnSpy.MCP.Protocol;
-using System.Buffers.Binary;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
@@ -11,22 +11,33 @@ namespace dnSpy.MCP.Extension.Transport {
     [Export(typeof(PipeServer))]
     [PartCreationPolicy(CreationPolicy.Shared)]
     public sealed class PipeServer {
+        private readonly HostInfo hostInfo;
         private readonly ScriptExecutor scripts;
-        public string PipeName => PipeProtocol.GetPipeName(Environment.ProcessId);
+        public string PipeName { get; }
 
         [ImportingConstructor]
         public PipeServer(ScriptExecutor scripts) {
             this.scripts = scripts;
+
+            using var process = Process.GetCurrentProcess();
+            PipeName = PipeProtocol.GetPipeName(process.Id);
+            this.hostInfo = new HostInfo(
+                process.Id,
+                Guid.NewGuid(),
+                System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+                typeof(PipeServer).Assembly.GetName().Version?.ToString() ?? "unknown"
+            );
         }
 
-        public async Task RunAsync(CancellationToken stopToken) {
+        public async Task RunAsync(CancellationToken stopToken, Action onListenCallback) {
+            bool listeningReported = false;
             while (!stopToken.IsCancellationRequested) {
-                using var pipe = new NamedPipeServerStream(
-                    PipeName,
-                    PipeDirection.InOut,
-                    maxNumberOfServerInstances: 1,
-                    PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                using var pipe = NamedPipeFactory.Create(PipeName);
+
+                if (!listeningReported) {
+                    listeningReported = true;
+                    onListenCallback();
+                }
 
                 await pipe.WaitForConnectionAsync(stopToken);
 
@@ -36,11 +47,16 @@ namespace dnSpy.MCP.Extension.Transport {
                     when (stopToken.IsCancellationRequested) {
                     return;
                 } catch (OperationCanceledException) {
-                    Trace.WriteLine("Client request timed out.");
+                    Log.W<PipeServer>(
+                        "Transport.ReceiveTimeout",
+                        "The client did not finish sending its request.");
                 } catch (Exception ex)
                     when (ex is IOException or InvalidDataException) {
 
-                    Trace.WriteLine($"Client request failed: {ex.GetType().Name}: {ex.Message}");
+                    Log.E<PipeServer>(
+                        "Transport.RequestFailed",
+                        ex,
+                        "The client request could not be processed.");
                 }
             }
         }
@@ -55,28 +71,7 @@ namespace dnSpy.MCP.Extension.Transport {
             }
             stopToken.ThrowIfCancellationRequested();
 
-            // Process the request and execute the script
-            ScriptResult result;
-            try {
-                var request = JsonSerializer.Deserialize<PipeRequest>(requestBytes);
-
-                if (request is null || string.IsNullOrWhiteSpace(request.Code)) {
-                    result = ScriptResult.Failure("invalid_request", "Code cannot be empty.");
-                } else {
-                    result = await scripts.ExecuteAsync(request.Code);
-                }
-            } catch (JsonException ex) {
-                result = ScriptResult.Failure("invalid_request", ex.Message);
-            } catch (Exception ex) {
-                result = ScriptResult.Failure("host_error", $"{ex.GetType().Name}: {ex.Message}");
-            }
-
-            // Serialize the result and send it back to the client
-            var responseBytes = JsonSerializer.SerializeToUtf8Bytes(result);
-            if (responseBytes.Length > PipeProtocol.MaxResponseSize) {
-                responseBytes = JsonSerializer.SerializeToUtf8Bytes(
-                    ScriptResult.Failure("response_too_large", "The script executed, but the response exceeds 4 MiB."));
-            }
+            var responseBytes = await DispatchAsync(requestBytes);
 
             using var sendTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
@@ -86,5 +81,74 @@ namespace dnSpy.MCP.Extension.Transport {
                 PipeProtocol.MaxResponseSize,
                 sendTimeout.Token);
         }
+        private async Task<byte[]> DispatchAsync(byte[] bytes) {
+            PipeRequest? request;
+
+            try {
+                request = JsonSerializer.Deserialize<PipeRequest>(bytes);
+            } catch (JsonException) {
+                return Reject(Guid.Empty, "invalid_request");
+            }
+
+            if(request is null) {
+                return Reject(Guid.Empty, "invalid_request");
+            }
+
+            var id = request.RequestId;
+
+
+            if (request.ProtocolVersion != PipeProtocol.Version) {
+                return Reject(id, "incompatible_protocol");
+            }
+
+            if (id == Guid.Empty) {
+                return Reject(id, "invalid_request");
+            }
+
+            switch (request.Operation) {
+                case PipeProtocol.Hello:
+                    if (request.Script is not null ||
+                        request.ExpectedInstanceId.HasValue) {
+                        return Reject(id, "invalid_request");
+                    }
+                    return Reply(id, hostInfo);
+
+                case PipeProtocol.Execute:
+                    if(request.ExpectedInstanceId != hostInfo.InstanceId) {
+                        return Reject(id, "instance_mismatch");
+                    }
+                    if (string.IsNullOrWhiteSpace(request.Script)) {
+                        return Reject(id, "invalid_request");
+                    }
+                    try {
+                        return Reply(id, await scripts.ExecuteAsync(request.Script!));
+                    } catch (Exception ex) {
+                        Log.E<PipeServer>(
+                            "Script.HostError",
+                            ex,
+                            "The script request {RequestId} failed in the host.",
+                            id);
+
+                        return Reject(id, "host_error");
+                    }
+                default:
+                    return Reject(id, "unknown_operation");
+            }
+        }
+        private static byte[] Reply<T>(Guid id, T value) where T : class {
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(
+                new PipeResponse<T>(PipeProtocol.Version, id, value, null));
+
+            return bytes.Length <= PipeProtocol.MaxResponseSize
+                ? bytes
+                : Reject(id, "response_too_large");
+        }
+        private static byte[] Reject(Guid id, string error) =>
+            JsonSerializer.SerializeToUtf8Bytes(
+                new PipeResponse<object>(
+                    PipeProtocol.Version,
+                    id,
+                    Result: null,
+                    Error: error));
     }
 }

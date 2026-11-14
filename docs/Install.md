@@ -12,37 +12,36 @@ These examples use Windows x64 with dnSpy installed at `D:\Tools\dnSpyEx`. Adjus
 
 ### 1. Prepare the environment
 
-- Download `dnSpy-net-win64.zip` from [dnSpyEx 6.6.0](https://github.com/dnSpyEx/dnSpy/releases/tag/v6.6.0) and extract it. The extension currently supports the .NET 10 build; .NET Framework builds are not supported.
-- Install the Windows x64 [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Skip this if you already have the .NET 10 SDK or Desktop Runtime.
+- Download the .NET 10 or .NET Framework 4.8 build of [dnSpyEx 6.6.0](https://github.com/dnSpyEx/dnSpy/releases/tag/v6.6.0) and extract it.
+- The packaged Server includes its runtime. No Visual Studio, .NET SDK or additional .NET 10 Runtime is needed. The Framework host still requires .NET Framework 4.8.
 
 ### 2. Install the extension
 
-Download `dnSpy-MCP-v<version>-windows.zip` from [Releases](https://github.com/freelyflyyy/dnSpy.MCP/releases) and extract it.
+Download **`dnSpy-MCP-v<version>-windows.zip`** from [Releases](https://github.com/freelyflyyy/dnSpy.MCP/releases) for the .NET 10 host, or **`dnSpy-MCP-v<version>-net48-windows.zip`** for the Framework host, and extract it.
 
-Close dnSpy and any MCP clients using this server, then copy:
+Close dnSpy and any MCP clients using this server, then run `install.cmd`. Enter the dnSpy installation directory or the full path to `dnSpy.exe`.
 
 | Package contents | Destination |
 |---|---|
-| All files inside `extension/` | `D:\Tools\dnSpyEx\bin\Extensions\` |
-| The entire `server/` folder | `D:\Tools\dnSpyEx\server\` |
+| Server EXE, extension DLLs and required dependencies | `D:\Tools\dnSpyEx\bin\Extensions\` |
 
-Create `Extensions` if it does not exist. Keep all dependencies and subfolders inside `server/`.
+The installer checks the package, creates the target directory and generates client configuration files. All runtime files are in one directory; there are no separate `extension/` and `server/` folders.
 
 ### 3. Start using it
 
 1. Launch dnSpy and open the .NET assembly you want to analyze.
-2. Click **View → 打开/关闭管道服务** (Toggle Pipe Service).
+2. The pipe service starts automatically. Check its status in the **MCP** menu.
 3. Configure your MCP client below, save, and restart the client.
 
 Once connected, ask your AI:
 
 > Use dnspy to list the currently loaded assemblies.
 
-Enable the pipe service again whenever you restart dnSpy.
+If you stop the service manually, use **MCP → Start Service** to start it again.
 
 ## Client Configuration
 
-Choose one setup method. Replace the sample dnSpy path, and update `command` if `dotnet.exe` is installed elsewhere.
+Choose one setup method and replace the sample dnSpy path. The installer also generates configuration files under `bin\Extensions\`.
 
 If you already have a configuration, add or update the `dnspy` entry while keeping your other servers.
 
@@ -53,9 +52,9 @@ Add this to `%USERPROFILE%\.codex\config.toml`:
 
 ```toml
 [mcp_servers.dnspy]
-command = "C:\\Program Files\\dotnet\\dotnet.exe"
-args = ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"]
-cwd = "D:\\Tools\\dnSpyEx\\server"
+command = "D:\\Tools\\dnSpyEx\\bin\\Extensions\\dnSpy.MCP.Server.exe"
+args = []
+cwd = "D:\\Tools\\dnSpyEx\\bin\\Extensions"
 ```
 
 </details>
@@ -70,8 +69,8 @@ Create or edit `.mcp.json` in the project where you use Claude Code:
   "mcpServers": {
     "dnspy": {
       "type": "stdio",
-      "command": "C:\\Program Files\\dotnet\\dotnet.exe",
-      "args": ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"]
+      "command": "D:\\Tools\\dnSpyEx\\bin\\Extensions\\dnSpy.MCP.Server.exe",
+      "args": []
     }
   }
 }
@@ -89,9 +88,9 @@ Open MCP management, add a server named `dnspy`, and paste this into the single-
 ```json
 {
   "type": "stdio",
-  "command": "C:\\Program Files\\dotnet\\dotnet.exe",
-  "args": ["D:\\Tools\\dnSpyEx\\server\\dnSpy.MCP.Server.dll"],
-  "cwd": "D:\\Tools\\dnSpyEx\\server"
+  "command": "D:\\Tools\\dnSpyEx\\bin\\Extensions\\dnSpy.MCP.Server.exe",
+  "args": [],
+  "cwd": "D:\\Tools\\dnSpyEx\\bin\\Extensions"
 }
 ```
 
@@ -106,35 +105,36 @@ Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.
 Clone or download this repository and open PowerShell in its root directory. Close dnSpy and any clients using this server, then run:
 
 ```powershell
-.\scripts\install.ps1 -DnSpyDir 'D:\Tools\dnSpyEx'
+.\scripts\build.ps1 -BuildId local-net10 -HostRuntime net10 -DnSpyDir 'D:\Tools\dnSpyEx\bin'
+.\scripts\install.ps1 -PackageDir '.\artifacts\build-local-net10' -DnSpyDir 'D:\Tools\dnSpyEx'
 ```
 
-The script builds and deploys the project, then generates and opens configuration files for Claude Code, Codex, and CC Switch. Add the appropriate configuration to your client and enable the pipe service as described above.
+Build the package first, then install it and use the generated configuration files for Claude Code, Codex or CC Switch. The installer does not invoke build tools or edit client settings.
 
-Pass the **dnSpy installation root**: the folder containing `dnSpy.exe`.
+Pass the **dnSpy installation root** to the installer: the folder containing `dnSpy.exe`.
 
-To build a package without installing it:
+To build a Framework package without installing it:
 
 ```powershell
-.\scripts\build.ps1 -DnSpyDir 'D:\Tools\dnSpyEx\bin'
+.\scripts\build.ps1 -BuildId local-net48 -HostRuntime net48 -DnSpyDir 'D:\Tools\dnSpyEx-NetFramework\bin'
 ```
 
-The build script takes the **`bin` directory**. It prints the output location under `artifacts/build-<id>/`. Copy its contents to the destinations listed in Quick Start.
+The build script takes the **`bin` directory**. It prints the output location under `artifacts/build-<id>/`. You can also run `install.cmd` from that directory.
 
 ## Updating
 
-Close dnSpy and any clients using this server. Back up the old files, then update the extension files and replace the entire `server/` directory using the same release. Keep other extensions intact.
-
-When installing from source, the installer automatically backs up existing files to:
+Close dnSpy and any clients using this server, extract the new release and run `install.cmd`. The installer updates this plugin's files and preserves other plugins. Existing files are backed up to:
 
 ```text
 <dnSpy installation>\.dnspy-mcp-backups\install-<id>\
 ```
 
+Legacy `server/` directories are left intact. Switch the client to the new EXE and verify it before retiring the old directory.
+
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| The client cannot start the server | Check the configured paths, .NET 10 Runtime, and that the entire `server/` folder was copied. |
-| The pipe service menu is missing | Use the .NET 10 build of dnSpyEx, check `bin\Extensions\`, and restart dnSpy. |
-| The AI cannot find a dnSpy session | Enable the pipe service. Run dnSpy and the MCP client under the same Windows account and privilege level. |
+| The client cannot start the server | Check that the client points to `bin\Extensions\dnSpy.MCP.Server.exe` and that the installation uses one matching release package. |
+| The pipe service menu is missing | Match the package to the dnSpy runtime, check `bin\Extensions\`, and restart dnSpy. |
+| The AI cannot find a dnSpy session | Check the service status in the MCP menu. Run dnSpy and the MCP client under the same Windows account and privilege level. |

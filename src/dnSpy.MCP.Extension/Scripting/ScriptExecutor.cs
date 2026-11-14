@@ -1,8 +1,10 @@
 ﻿using dnSpy.MCP.Extension.Api;
+using dnSpy.MCP.Logging;
 using dnSpy.MCP.Protocol;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using System.ComponentModel.Composition;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Windows.Threading;
 
@@ -45,7 +47,41 @@ namespace dnSpy.MCP.Extension.Scripting {
             await executionGate.WaitAsync();
 
             try {
-                return await ExecuteCoreAsync(code);
+                var watch = Stopwatch.StartNew();
+                var result = await ExecuteCoreAsync(code);
+                watch.Stop();
+
+                string preview;
+                try {
+                    if (result.Success) {
+                        preview = result.Value switch {
+                            JsonElement json => json.GetRawText(),
+                            null => "null",
+                            _ => "<preview unavailable>"
+                        };
+                    } else {
+                        preview = result.Error?.Message ?? "Unknown error";
+                        if (result.Error?.Diagnostics is { Length: > 0 } diag) {
+                            preview += "; " + diag[0];
+                        }
+                    }
+                } catch (Exception previewError) {
+                    preview = $"<preview unavailable: {previewError.GetType().Name}>";
+                }
+
+                if (result.Success) {
+                    Log.I<ScriptExecutor>(
+                        "Script.Completed",
+                        "Script completed: {Script}; result={ResultPreview}; elapsed={ElapsedMs}ms",
+                        code, preview, watch.ElapsedMilliseconds);
+                } else {
+                    Log.E<ScriptExecutor>(
+                        "Script.Failed",
+                        "Script failed ({ErrorCode}): {Script}; result={ResultPreview}; elapsed={ElapsedMs}ms",
+                        result.Error?.Code, code, preview, watch.ElapsedMilliseconds);
+                }
+
+                return result;
             } finally {
                 executionGate.Release();
             }
