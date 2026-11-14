@@ -71,6 +71,7 @@ function Invoke-Install {
     if ($ok -ne $ShouldSucceed) {
         throw "Unexpected installer exit: $LASTEXITCODE"
     }
+    $global:LASTEXITCODE = 0
 }
 
 $oldPath = $env:PATH
@@ -180,4 +181,5 @@ try {
     $env:DOTNET_ROOT_X64 = $oldRoot64
 }
 
+$global:LASTEXITCODE = 0
 Write-Host "[test] Package tests passed. Fixtures retained at: $testRoot"
